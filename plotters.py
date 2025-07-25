@@ -14,15 +14,41 @@ def plot_rtp_rate(ax, df):
     starttime = df.index[0]
     df['second'] = (df.index - starttime).total_seconds()
     df.set_index('second', inplace=True)
-
     ax.plot(df.index, df['rate'], linewidth=0.5)
     ax.set_ylim(bottom=0, top=6e6)
-    ax.set_title('RTP Rate')
     ax.set_xlabel('Time')
     ax.set_ylabel('Rate')
     ax.xaxis.set_major_formatter(
         mticker.FuncFormatter(lambda x, pos: f'{x:.0f}s'))
     ax.yaxis.set_major_formatter(mticker.EngFormatter(unit='bit/s'))
+
+
+def plot_rtp_loss(ax, rtp_tx_df, rtp_rx_df):
+    rtp_tx_df = rtp_tx_df.reset_index()
+    rtp_rx_df = rtp_rx_df.reset_index()
+    tx_df = rtp_tx_df[['time', 'extseq']]
+    rx_df = rtp_rx_df[['time', 'extseq']]
+    df = pd.merge(tx_df, rx_df, on='extseq', how='left', indicator=True)
+    df['tx'] = pd.to_datetime(df['time_x'])
+    df['second'] = df['tx'].dt.floor('s')
+    df['lost'] = df['_merge'] == 'left_only'
+    df = df.groupby('second').agg(
+        sent=('extseq', 'count'),
+        lost=('lost', 'sum')
+    )
+    df['loss_rate'] = df['lost'] / df['sent']
+
+    starttime = df.index[0]
+    df['second'] = (df.index - starttime).total_seconds()
+    df.set_index('second', inplace=True)
+
+    ax.plot(df.index, df['loss_rate'])
+    ax.set_xlabel('Time')
+    ax.set_ylabel('Loss Rate')
+    ax.set_ylim(bottom=0)
+    ax.xaxis.set_major_formatter(
+        mticker.FuncFormatter(lambda x, pos: f'{x:.0f}s'))
+    ax.yaxis.set_major_formatter(mticker.PercentFormatter(xmax=1.0))
 
 
 def plot_rtp_owd(ax, rtp_tx_df, rtp_rx_df):
@@ -41,7 +67,6 @@ def plot_rtp_owd(ax, rtp_tx_df, rtp_rx_df):
     df.set_index('second', inplace=True)
 
     ax.plot(df.index, df['latency'], label='Latency', linewidth=0.5)
-    ax.set_title('Latency')
     ax.set_ylim(bottom=0, top=0.5)
     ax.set_xlabel('Time')
     ax.set_ylabel('Latency')

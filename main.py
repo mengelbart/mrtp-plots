@@ -13,8 +13,13 @@ import html_generator
 import serializers
 
 plots = [
-    (plotters.plot_rtp_rate, ['receiver.stderr.feather'], 'rtp_rate.png'),
-    (plotters.plot_rtp_owd, ['ns4.rtp.feather',
+    ('RTP Send Rate', plotters.plot_rtp_rate, [
+     'sender.stderr.feather'], 'rtp_send_rate.png'),
+    ('RTP Recv Rate', plotters.plot_rtp_rate, [
+     'receiver.stderr.feather'], 'rtp_recv_rate.png'),
+    ('RTP Loss Rate', plotters.plot_rtp_loss, ['ns4.rtp.feather',
+     'ns1.rtp.feather'], 'rtp_loss.png'),
+    ('RTP OWD', plotters.plot_rtp_owd, ['ns4.rtp.feather',
      'ns1.rtp.feather'], 'rtp_owd.png')
 ]
 
@@ -45,7 +50,7 @@ async def parse_cmd(args):
 
 
 async def plot_cmd(args):
-    for func, files, out_name in plots:
+    for title, func, files, out_name in plots:
         fig, ax = plt.subplots(nrows=1, ncols=1, figsize=(8, 3))
         paths = [Path(args.input) / Path(f) for f in files]
         if all(p.is_file() for p in paths):
@@ -55,6 +60,7 @@ async def plot_cmd(args):
             missing = [str(p) for p in paths if not p.is_file()]
             print(
                 f'skipping plot {func.__name__} due to missing dependencies {', '.join(missing)}')
+        ax.set_title(title)
         fig.autofmt_xdate()
         fig.tight_layout()
         fig.savefig(Path(args.output) / Path(out_name), dpi=300)
