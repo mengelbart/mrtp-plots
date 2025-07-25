@@ -1,7 +1,5 @@
 from pathlib import Path
 import jinja2
-import glob
-import os
 
 
 def generate_html(input):
