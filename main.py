@@ -2,6 +2,8 @@
 
 import argparse
 import json
+import glob
+import os
 
 import pandas as pd
 import pyarrow as pa
@@ -9,6 +11,7 @@ import pyarrow.feather as feather
 import matplotlib.dates as mdates
 import matplotlib.ticker as mticker
 import matplotlib.pyplot as plt
+import jinja2
 
 
 def parse_json_log(log_file, out_file):
@@ -46,7 +49,7 @@ def plot_rtp_rate(df, out_file):
 
     fig, ax = plt.subplots(nrows=1, ncols=1)
     ax.plot(df.index, df['rate'], linewidth=0.5)
-    ax.set_ylim(bottom=0, top=1.5e6)
+    ax.set_ylim(bottom=0, top=3e6)
     ax.set_title('RTP Rate')
     ax.set_xlabel('Time')
     ax.set_ylabel('Rate')
@@ -67,6 +70,23 @@ def plot_rtp_rate1(df, out_file):
     plt.close(fig)
 
 
+def generate_html(input):
+    image_paths = glob.glob(f'{input}/*/rtp_rate.png', recursive=True)
+    images = []
+    for path in image_paths:
+        html_path = path.replace(os.sep, '/')
+        dir_name = os.path.basename(os.path.dirname(path))
+        images.append({'path': html_path, 'caption': dir_name})
+
+    env = jinja2.Environment(loader=jinja2.FileSystemLoader("templates"))
+    template = env.get_template("index.html")
+
+    rendered_html = template.render(images=images)
+
+    with open('index.html', 'w') as f:
+        f.write(rendered_html)
+
+
 def parse_cmd(args):
     parse_json_log(args.input, args.output)
 
@@ -74,6 +94,10 @@ def parse_cmd(args):
 def plot_cmd(args):
     df = read_feather(args.input)
     plot_rtp_rate(df, args.output)
+
+
+def generate_cmd(args):
+    generate_html(args.input)
 
 
 def main():
@@ -97,6 +121,12 @@ def main():
         '-o', '--output', help='output plot file', required=True)
     plot.set_defaults(func=plot_cmd)
 
+    generate = subparsers.add_parser(
+        'generate', help='generates a HTML site to show results')
+
+    generate.set_defaults(func=generate_cmd)
+    generate.add_argument(
+        '-i', '--input', help='input directory', required=True)
     args = parser.parse_args()
     args.func(args)
 
