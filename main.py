@@ -12,6 +12,12 @@ import plotters
 import html_generator
 import serializers
 
+plots = [
+    (plotters.plot_rtp_rate, ['receiver.stderr.feather'], 'rtp_rate.png'),
+    (plotters.plot_rtp_owd, ['ns4.rtp.feather',
+     'ns1.rtp.feather'], 'rtp_owd.png')
+]
+
 
 async def parse_file(input, out_dir):
     path = Path(input)
@@ -22,9 +28,9 @@ async def parse_file(input, out_dir):
     if path.suffix == '.pcap':
         rtp, rtcp = await parsers.parse_pcap(input)
         serializers.write_feather(
-            rtp, Path(out_dir) / Path(input).with_suffix('.pcap.feather').name)
+            rtp, Path(out_dir) / Path(Path(input).stem + '.rtp.feather'))
         serializers.write_feather(rtcp, Path(
-            out_dir) / Path(input).with_suffix('.pcap.feather').name)
+            out_dir) / Path(Path(input).stem + '.rtcp.feather'))
 
 
 async def parse_all_cmd(args):
@@ -39,13 +45,20 @@ async def parse_cmd(args):
 
 
 async def plot_cmd(args):
-    df = serializers.read_feather(args.input)
-    fig, ax = plt.subplots(nrows=1, ncols=1, figsize=(8, 3))
-    plotters.plot_rtp_rate(ax, df)
-    fig.autofmt_xdate()
-    fig.tight_layout()
-    fig.savefig(args.output, dpi=300)
-    plt.close(fig)
+    for func, files, out_name in plots:
+        fig, ax = plt.subplots(nrows=1, ncols=1, figsize=(8, 3))
+        paths = [Path(args.input) / Path(f) for f in files]
+        if all(p.is_file() for p in paths):
+            dfs = [serializers.read_feather(p) for p in paths]
+            func(ax, *dfs)
+        else:
+            missing = [str(p) for p in paths if not p.is_file()]
+            print(
+                f'skipping plot {func.__name__} due to missing dependencies {', '.join(missing)}')
+        fig.autofmt_xdate()
+        fig.tight_layout()
+        fig.savefig(Path(args.output) / Path(out_name), dpi=300)
+        plt.close(fig)
 
 
 async def generate_cmd(args):
@@ -75,9 +88,9 @@ def main():
     plot = subparsers.add_parser(
         'plot', help='reads a data frame from a feather file and creates plots')
     plot.add_argument(
-        '-i', '--input', help='input feather file', required=True)
+        '-i', '--input', help='input directory', required=True)
     plot.add_argument(
-        '-o', '--output', help='output plot file', required=True)
+        '-o', '--output', help='output directory', required=True)
     plot.set_defaults(func=plot_cmd)
 
     generate = subparsers.add_parser(
