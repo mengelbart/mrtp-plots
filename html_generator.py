@@ -5,9 +5,7 @@ import os
 
 
 def generate_html(input):
-    image_paths = glob.glob(f'{input}/*/*.png', recursive=True)
     data = []
-
     for subdir in Path(input).iterdir():
         if subdir.is_dir():
             images = sorted(subdir.glob('*.png'))
