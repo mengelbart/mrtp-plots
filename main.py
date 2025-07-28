@@ -13,10 +13,12 @@ import html_generator
 import serializers
 
 plots = [
-    ('RTP Send Rate', plotters.plot_rtp_rate, [
-     'sender.stderr.feather'], 'rtp_send_rate.png'),
-    ('RTP Recv Rate', plotters.plot_rtp_rate, [
-     'receiver.stderr.feather'], 'rtp_recv_rate.png'),
+    ('RTP Rates', plotters.plot_rtp_rates, [
+     'sender.stderr.feather', 'receiver.stderr.feather'], 'rtp_rates.png'),
+    # ('RTP Send Rate', plotters.plot_rtp_rate, [
+    #  'sender.stderr.feather'], 'rtp_send_rate.png'),
+    # ('RTP Recv Rate', plotters.plot_rtp_rate, [
+    #  'receiver.stderr.feather'], 'rtp_recv_rate.png'),
     ('RTP Loss Rate', plotters.plot_rtp_loss, ['ns4.rtp.feather',
      'ns1.rtp.feather'], 'rtp_loss.png'),
     ('RTP OWD', plotters.plot_rtp_owd, ['ns4.rtp.feather',

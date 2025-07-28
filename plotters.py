@@ -5,7 +5,32 @@ import matplotlib.pyplot as plt
 import pandas as pd
 
 
-def plot_rtp_rate(ax, df):
+def plot_rtp_rates(ax, tx_df, rx_df):
+    plot_rtp_rate(ax, tx_df, 'tx')
+    plot_rtp_rate(ax, rx_df, 'rx')
+    plot_target_rate(ax, tx_df)
+    ax.set_ylim(bottom=0, top=6e6)
+    ax.set_xlabel('Time')
+    ax.set_ylabel('Rate')
+    ax.xaxis.set_major_formatter(
+        mticker.FuncFormatter(lambda x, pos: f'{x:.0f}s'))
+    ax.yaxis.set_major_formatter(mticker.EngFormatter(unit='bit/s'))
+    ax.legend(loc='upper right')
+
+
+def plot_target_rate(ax, df):
+    df = df[df['msg'] == 'NEW_TARGET_RATE'].copy()
+    if df.empty:
+        return
+    df['timestamp'] = pd.to_datetime(df['time'])
+    df.set_index('timestamp', inplace=True)
+    starttime = df.index[0]
+    df['second'] = (df.index - starttime).total_seconds()
+    df.set_index('second', inplace=True)
+    ax.plot(df.index, df['rate'], label='target', linewidth=0.5)
+
+
+def plot_rtp_rate(ax, df, label):
     df = df[df['msg'] == 'rtp packet'].copy()
     df['rate'] = df['rtp-packet.payload-length'] * 80
     df['timestamp'] = pd.to_datetime(df['time'])
@@ -14,13 +39,7 @@ def plot_rtp_rate(ax, df):
     starttime = df.index[0]
     df['second'] = (df.index - starttime).total_seconds()
     df.set_index('second', inplace=True)
-    ax.plot(df.index, df['rate'], linewidth=0.5)
-    ax.set_ylim(bottom=0, top=6e6)
-    ax.set_xlabel('Time')
-    ax.set_ylabel('Rate')
-    ax.xaxis.set_major_formatter(
-        mticker.FuncFormatter(lambda x, pos: f'{x:.0f}s'))
-    ax.yaxis.set_major_formatter(mticker.EngFormatter(unit='bit/s'))
+    ax.plot(df.index, df['rate'], label=label, linewidth=0.5)
 
 
 def plot_rtp_loss(ax, rtp_tx_df, rtp_rx_df):
