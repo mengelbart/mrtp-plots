@@ -3,9 +3,11 @@
 import argparse
 import asyncio
 
+import datetime
 from pathlib import Path
 
 import matplotlib.pyplot as plt
+import pandas as pd
 
 import parsers
 import plotters
@@ -14,7 +16,7 @@ import serializers
 
 plots = [
     ('RTP Rates', plotters.plot_rtp_rates, [
-     'sender.stderr.feather', 'receiver.stderr.feather'], 'rtp_rates.png'),
+     'tc.feather', 'sender.stderr.feather', 'receiver.stderr.feather'], 'rtp_rates.png'),
     # ('RTP Send Rate', plotters.plot_rtp_rate, [
     #  'sender.stderr.feather'], 'rtp_send_rate.png'),
     # ('RTP Recv Rate', plotters.plot_rtp_rate, [
@@ -28,7 +30,7 @@ plots = [
 
 async def parse_file(input, out_dir):
     path = Path(input)
-    if path.name in ['receiver.stderr.log', 'sender.stderr.log']:
+    if path.name in ['config.json', 'tc.log', 'receiver.stderr.log', 'sender.stderr.log']:
         df = parsers.parse_json_log(input)
         serializers.write_feather(
             df, Path(out_dir) / Path(input).with_suffix('.feather').name)
@@ -52,12 +54,16 @@ async def parse_cmd(args):
 
 
 async def plot_cmd(args):
+    config_feather = Path(args.input) / Path('config.feather')
+    config = serializers.read_feather(config_feather)
+    start_time = pd.Timestamp(config['time'][0])
+
     for title, func, files, out_name in plots:
         fig, ax = plt.subplots(nrows=1, ncols=1, figsize=(8, 3))
         paths = [Path(args.input) / Path(f) for f in files]
         if all(p.is_file() for p in paths):
             dfs = [serializers.read_feather(p) for p in paths]
-            func(ax, *dfs)
+            func(ax, start_time, *dfs)
         else:
             missing = [str(p) for p in paths if not p.is_file()]
             print(
