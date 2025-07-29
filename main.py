@@ -24,7 +24,11 @@ plots = [
     ('RTP Loss Rate', plotters.plot_rtp_loss, ['ns4.rtp.feather',
      'ns1.rtp.feather'], 'rtp_loss.png'),
     ('RTP OWD', plotters.plot_rtp_owd, ['ns4.rtp.feather',
-     'ns1.rtp.feather'], 'rtp_owd.png')
+     'ns1.rtp.feather'], 'rtp_owd.png'),
+    ('SCReAM Queue Delay', plotters.plot_scream_queue_delay,
+     ['sender.stderr.feather'], 'scream_queue_delay.png'),
+    ('SCReAM CWND', plotters.plot_scream_cwnd, [
+     'sender.stderr.feather'], 'scream_cwnd.png'),
 ]
 
 
@@ -63,7 +67,10 @@ async def plot_cmd(args):
         paths = [Path(args.input) / Path(f) for f in files]
         if all(p.is_file() for p in paths):
             dfs = [serializers.read_feather(p) for p in paths]
-            func(ax, start_time, *dfs)
+            plotted = func(ax, start_time, *dfs)
+            if not plotted:
+                print(f'dropping empty plot {func.__name__}')
+                continue
         else:
             missing = [str(p) for p in paths if not p.is_file()]
             print(

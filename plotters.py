@@ -11,6 +11,25 @@ unit_multipliers = {
 }
 
 
+def parse_rate(rate_str):
+    match = re.match(r'([\d.]+)([a-zA-Z]+)', rate_str.strip())
+    if not match:
+        raise ValueError(f'invalid rate format {rate_str}')
+    value, unit = match.groups()
+    unit = unit.lower()
+    if unit not in unit_multipliers:
+        raise ValueError(f'unknown unit {unit}')
+    return float(value) * unit_multipliers[unit]
+
+
+def set_start_time_index(df, start_time, time_column):
+    df['timestamp'] = pd.to_datetime(df[time_column])
+    df.set_index('timestamp', inplace=True)
+    df['second'] = (df.index - start_time).total_seconds()
+    df.set_index('second', inplace=True)
+    return df
+
+
 def plot_rtp_rates(ax, start_time, cap_df, tx_df, rx_df):
     plot_capacity(ax, start_time, cap_df)
     plot_rtp_rate(ax, start_time, tx_df, 'tx')
@@ -23,38 +42,24 @@ def plot_rtp_rates(ax, start_time, cap_df, tx_df, rx_df):
         mticker.FuncFormatter(lambda x, pos: f'{x:.0f}s'))
     ax.yaxis.set_major_formatter(mticker.EngFormatter(unit='bit/s'))
     ax.legend(loc='upper right')
-
-
-def parse_rate(rate_str):
-    match = re.match(r'([\d.]+)([a-zA-Z]+)', rate_str.strip())
-    if not match:
-        raise ValueError(f'invalid rate format {rate_str}')
-    value, unit = match.groups()
-    unit = unit.lower()
-    if unit not in unit_multipliers:
-        raise ValueError(f'unknown unit {unit}')
-    return float(value) * unit_multipliers[unit]
+    return True
 
 
 def plot_capacity(ax, start_time, df):
     df['rate'] = df['bandwidth'].apply(parse_rate)
-    df['timestamp'] = pd.to_datetime(df['time'])
-    df.set_index('timestamp', inplace=True)
-    df['second'] = (df.index - start_time).total_seconds()
-    df.set_index('second', inplace=True)
+    df = set_start_time_index(df, start_time, 'time')
     ax.step(df.index, df['rate'], where='post',
             label='capacity', linewidth=0.5)
+    return True
 
 
 def plot_target_rate(ax, start_time, df):
     df = df[df['msg'] == 'NEW_TARGET_RATE'].copy()
     if df.empty:
         return
-    df['timestamp'] = pd.to_datetime(df['time'])
-    df.set_index('timestamp', inplace=True)
-    df['second'] = (df.index - start_time).total_seconds()
-    df.set_index('second', inplace=True)
+    df = set_start_time_index(df, start_time, 'time')
     ax.plot(df.index, df['rate'], label='target', linewidth=0.5)
+    return True
 
 
 def plot_rtp_rate(ax, start_time, df, label):
@@ -66,6 +71,7 @@ def plot_rtp_rate(ax, start_time, df, label):
     df['second'] = (df.index - start_time).total_seconds()
     df.set_index('second', inplace=True)
     ax.plot(df.index, df['rate'], label=label, linewidth=0.5)
+    return True
 
 
 def plot_rtp_loss(ax, start_time, rtp_tx_df, rtp_rx_df):
@@ -93,6 +99,7 @@ def plot_rtp_loss(ax, start_time, rtp_tx_df, rtp_rx_df):
     ax.xaxis.set_major_formatter(
         mticker.FuncFormatter(lambda x, pos: f'{x:.0f}s'))
     ax.yaxis.set_major_formatter(mticker.PercentFormatter(xmax=1.0))
+    return True
 
 
 def plot_rtp_owd(ax, start_time, rtp_tx_df, rtp_rx_df):
@@ -103,12 +110,7 @@ def plot_rtp_owd(ax, start_time, rtp_tx_df, rtp_rx_df):
     df = rtp_tx_latency_df.merge(rtp_rx_latency_df, on='extseq')
     df['latency'] = (df['ts_y'] - df['ts_x']) / \
         datetime.timedelta(milliseconds=1) / 1000.0
-
-    df['ts'] = pd.to_datetime(df['ts_x'])
-    df.set_index('ts', inplace=True)
-    df['second'] = (df.index - start_time).total_seconds()
-    df.set_index('second', inplace=True)
-
+    df = set_start_time_index(df, start_time, 'ts_x')
     ax.plot(df.index, df['latency'], label='Latency', linewidth=0.5)
     ax.set_ylim(bottom=0, top=0.5)
     ax.set_xlabel('Time')
@@ -116,3 +118,43 @@ def plot_rtp_owd(ax, start_time, rtp_tx_df, rtp_rx_df):
     ax.xaxis.set_major_formatter(
         mticker.FuncFormatter(lambda x, pos: f'{x:.0f}s'))
     ax.yaxis.set_major_formatter(mticker.EngFormatter(unit='s'))
+    return True
+
+
+def plot_scream_queue_delay(ax, start_time, df):
+    df = df[df['msg'] == 'SCReAM stats'].copy()
+    if df.empty:
+        return False
+    df = set_start_time_index(df, start_time, 'time')
+    ax.plot(df.index, df['queueDelay'], label='queueDelay', linewidth=0.5)
+    ax.plot(df.index, df['queueDelayMax'],
+            label='queueDelayMax', linewidth=0.5)
+    ax.plot(df.index, df['queueDelayMinAvg'],
+            label='queueDelayMinAvg', linewidth=0.5)
+    ax.plot(df.index, df['sRtt'], label='sRtt', linewidth=0.5)
+    ax.plot(df.index, df['rtpQueueDelay'],
+            label='rtpQueueDelay', linewidth=0.5)
+    ax.set_xlabel('Time')
+    ax.set_ylabel('Delay')
+    ax.xaxis.set_major_formatter(
+        mticker.FuncFormatter(lambda x, pos: f'{x:.0f}s'))
+    ax.yaxis.set_major_formatter(mticker.EngFormatter(unit='s'))
+    ax.legend(loc='upper right')
+    return True
+
+
+def plot_scream_cwnd(ax, start_time, df):
+    df = df[df['msg'] == 'SCReAM stats'].copy()
+    if df.empty:
+        return False
+    df = set_start_time_index(df, start_time, 'time')
+    ax.plot(df.index, df['cwnd'], label='cwnd', linewidth=0.5)
+    ax.plot(df.index, df['bytesInFlightLog'],
+            label='bytesInFlightLog', linewidth=0.5)
+    ax.set_xlabel('Time')
+    ax.set_ylabel('Size')
+    ax.xaxis.set_major_formatter(
+        mticker.FuncFormatter(lambda x, pos: f'{x:.0f}s'))
+    ax.yaxis.set_major_formatter(mticker.EngFormatter(unit='B'))
+    ax.legend(loc='upper right')
+    return True
