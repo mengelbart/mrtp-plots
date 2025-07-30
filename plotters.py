@@ -158,3 +158,71 @@ def plot_scream_cwnd(ax, start_time, df):
     ax.yaxis.set_major_formatter(mticker.EngFormatter(unit='B'))
     ax.legend(loc='upper right')
     return True
+
+
+def plot_gcc_rtt(ax, start_time, df):
+    df = df[df['msg'] == 'pion-trace-log'].copy()
+    if df.empty:
+        return False
+    if not 'rtt' in df.columns:
+        return False
+    df = set_start_time_index(df, start_time, 'time')
+    df['rtt'] = df['rtt']*1e-9
+    df = df.dropna(subset=['rtt'])
+    ax.plot(df.index, df['rtt'], label='RTT', linewidth=0.5)
+    ax.set_xlabel('Time')
+    ax.set_ylabel('Size')
+    ax.xaxis.set_major_formatter(
+        mticker.FuncFormatter(lambda x, pos: f'{x:.0f}s'))
+    ax.yaxis.set_major_formatter(mticker.EngFormatter(unit='s'))
+    ax.legend(loc='upper right')
+    return True
+
+
+def plot_gcc_target_rates(ax, start_time, df):
+    df = df[df['msg'] == 'pion-trace-log'].copy()
+    if df.empty:
+        return False
+    if 'loss-target' not in df.columns or 'delay-target' not in df.columns:
+        return False
+    df = df.dropna(subset=['loss-target', 'delay-target', 'target'])
+    df = set_start_time_index(df, start_time, 'time')
+    ax.plot(df.index, df['loss-target'], label='loss-target', linewidth=0.5)
+    ax.plot(df.index, df['delay-target'], label='delay-target', linewidth=0.5)
+    ax.plot(df.index, df['target'], label='target', linewidth=0.5)
+    ax.set_xlabel('Time')
+    ax.set_ylabel('Rate')
+    ax.xaxis.set_major_formatter(
+        mticker.FuncFormatter(lambda x, pos: f'{x:.0f}s'))
+    ax.yaxis.set_major_formatter(mticker.EngFormatter(unit='b/s'))
+    ax.legend(loc='upper right')
+    return True
+
+
+def plot_gcc_estimates(ax, start_time, df):
+    df = df[df['msg'] == 'pion-trace-log'].copy()
+    if df.empty:
+        return False
+    if 'estimate' not in df.columns:
+        return False
+    df = set_start_time_index(df, start_time, 'time')
+    df['interGroupDelay'] = df['interGroupDelay'] * 1e-3
+    df['estimate'] = df['estimate'] * 60
+    df = df.dropna(subset=['estimate', 'threshold'])
+    # ax.plot(df.index, df['interArrivalTime'],
+    #         label='interArrivalTime', linewidth=0.5)
+    # ax.plot(df.index, df['interDepartureTime'],
+    #         label='interDepartureTime', linewidth=0.5)
+    print(df[['interGroupDelay', 'seq']].head(50))
+    ax.plot(df.index, df['interGroupDelay'],
+            label='interGroupDelay', linewidth=0.5)
+    ax.plot(df.index, df['estimate'], label='estimate', linewidth=0.5)
+    ax.plot(df.index, df['threshold'], label='threshold', linewidth=0.5)
+    ax.plot(df.index, -df['threshold'], label='-threshold', linewidth=0.5)
+    ax.set_xlabel('Time')
+    ax.set_ylabel('Time')
+    ax.xaxis.set_major_formatter(
+        mticker.FuncFormatter(lambda x, pos: f'{x:.0f}s'))
+    ax.yaxis.set_major_formatter(mticker.EngFormatter(unit='s'))
+    ax.legend(loc='upper right')
+    return True

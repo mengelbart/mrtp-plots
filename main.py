@@ -29,6 +29,12 @@ plots = [
      ['sender.stderr.feather'], 'scream_queue_delay.png'),
     ('SCReAM CWND', plotters.plot_scream_cwnd, [
      'sender.stderr.feather'], 'scream_cwnd.png'),
+    ('GCC RTT', plotters.plot_gcc_rtt, [
+     'sender.stderr.feather'], 'gcc_rtt.png'),
+    ('GCC Target Rates', plotters.plot_gcc_target_rates, [
+        'sender.stderr.feather'], 'gcc_target_rates.png'),
+    ('GCC Estimates', plotters.plot_gcc_estimates, [
+     'sender.stderr.feather'], 'gcc_estimates.png'),
 ]
 
 
