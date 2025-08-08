@@ -35,6 +35,8 @@ plots = [
         'sender.stderr.feather'], 'gcc_target_rates.png'),
     ('GCC Estimates', plotters.plot_gcc_estimates, [
      'sender.stderr.feather'], 'gcc_estimates.png'),
+    ('GCC Usage and State', plotters.plot_gcc_usage_and_state,
+     ['sender.stderr.feather'], 'gcc_usage_state.png'),
 ]
 
 

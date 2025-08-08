@@ -10,6 +10,12 @@ unit_multipliers = {
     'gbit': 1_000_000_000,
 }
 
+usage_and_state = {
+    -1: 'over / decrease',
+    0: 'hold / normal',
+    1: 'under / increase',
+}
+
 
 def parse_rate(rate_str):
     match = re.match(r'([\d.]+)([a-zA-Z]+)', rate_str.strip())
@@ -209,11 +215,6 @@ def plot_gcc_estimates(ax, start_time, df):
     df['interGroupDelay'] = df['interGroupDelay'] * 1e-3
     df['estimate'] = df['estimate'] * 60
     df = df.dropna(subset=['estimate', 'threshold'])
-    # ax.plot(df.index, df['interArrivalTime'],
-    #         label='interArrivalTime', linewidth=0.5)
-    # ax.plot(df.index, df['interDepartureTime'],
-    #         label='interDepartureTime', linewidth=0.5)
-    print(df[['interGroupDelay', 'seq']].head(50))
     ax.plot(df.index, df['interGroupDelay'],
             label='interGroupDelay', linewidth=0.5)
     ax.plot(df.index, df['estimate'], label='estimate', linewidth=0.5)
@@ -224,5 +225,25 @@ def plot_gcc_estimates(ax, start_time, df):
     ax.xaxis.set_major_formatter(
         mticker.FuncFormatter(lambda x, pos: f'{x:.0f}s'))
     ax.yaxis.set_major_formatter(mticker.EngFormatter(unit='s'))
+    ax.legend(loc='upper right')
+    return True
+
+
+def plot_gcc_usage_and_state(ax, start_time, df):
+    df = df[df['msg'] == 'pion-trace-log'].copy()
+    if df.empty:
+        return False
+    if 'usage' not in df.columns or 'state' not in df.columns:
+        return False
+    df = set_start_time_index(df, start_time, 'time')
+    df = df.dropna(subset=['usage', 'state'])
+    df['usage'] = -df['usage']
+    ax.step(df.index, df['usage'], where='post', label='usage', linewidth=0.5)
+    ax.step(df.index, df['state'], where='post', label='state', linewidth=0.5)
+    ax.set_xlabel('Time')
+    ax.xaxis.set_major_formatter(
+        mticker.FuncFormatter(lambda x, pos: f'{x:.0f}s'))
+    ax.yaxis.set_major_formatter(
+        mticker.FuncFormatter(lambda x, pos: usage_and_state.get(x, '')))
     ax.legend(loc='upper right')
     return True
