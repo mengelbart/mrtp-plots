@@ -21,11 +21,10 @@ def _save_delay_graph(ax, fig, image_path, legend, yname):
     ax.set_ylabel(yname)
     ax.set_xlabel("Time")
     ax.xaxis.set_major_formatter(mticker.FuncFormatter(lambda x, pos: f"{x:.0f}s"))
-    ax.grid(axis="y")
-
     ax.set_title(image_path.name.split("/")[-1].replace(".png", ""))
 
     fig.tight_layout()
+    fig.autofmt_xdate()
     fig.savefig(image_path, bbox_inches="tight")
     plt.close()
 
@@ -41,7 +40,7 @@ def _plot_capacity(ax, legend, path_to_case):
     cap_feather = Path(path_to_case) / Path("tc.feather")
     cap = serializers.read_feather(cap_feather)
     plotters.plot_capacity(ax, start_time, cap)
-    legend.append("Capacity")
+    legend.append("capacity")
 
 
 def plot_delay(testtype, cases, out):
@@ -63,7 +62,7 @@ def plot_delay(testtype, cases, out):
 
         legend.append(case[2])
 
-    _save_delay_graph(ax, fig, image_name, legend, "Delay [ms]")
+    _save_delay_graph(ax, fig, image_name, legend, "Latency")
 
 
 def plot_send_rate(testtype, cases, out):
