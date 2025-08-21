@@ -21,10 +21,14 @@ plots = [
     #  'sender.stderr.feather'], 'rtp_send_rate.png'),
     # ('RTP Recv Rate', plotters.plot_rtp_rate, [
     #  'receiver.stderr.feather'], 'rtp_recv_rate.png'),
-    ('RTP Loss Rate', plotters.plot_rtp_loss, ['ns4.rtp.feather',
+    ('RTP Loss Rate', plotters.plot_rtp_loss_pcap, ['ns4.rtp.feather',
      'ns1.rtp.feather'], 'rtp_loss.png'),
-    ('RTP OWD', plotters.plot_rtp_owd, ['ns4.rtp.feather',
+    ('RTP Loss Rate', plotters.plot_rtp_loss_log, ['sender.stderr.feather',
+     'receiver.stderr.feather'], 'rtp_loss_log.png'),
+    ('RTP OWD', plotters.plot_rtp_owd_pcap, ['ns4.rtp.feather',
      'ns1.rtp.feather'], 'rtp_owd.png'),
+    ('RTP OWD', plotters.plot_rtp_owd_log, ['sender.stderr.feather',
+     'receiver.stderr.feather'], 'rtp_owd_log.png'),
     ('SCReAM Queue Delay', plotters.plot_scream_queue_delay,
      ['sender.stderr.feather'], 'scream_queue_delay.png'),
     ('SCReAM CWND', plotters.plot_scream_cwnd, [
@@ -48,6 +52,9 @@ async def parse_file(input, out_dir):
             df, Path(out_dir) / Path(input).with_suffix('.feather').name)
     if path.suffix == '.pcap':
         rtp, rtcp = await parsers.parse_pcap(input)
+        if rtp.empty or rtcp.empty:
+            return
+
         serializers.write_feather(
             rtp, Path(out_dir) / Path(Path(input).stem + '.rtp.feather'))
         serializers.write_feather(rtcp, Path(
@@ -83,6 +90,7 @@ async def plot_cmd(args):
             missing = [str(p) for p in paths if not p.is_file()]
             print(
                 f'skipping plot {func.__name__} due to missing dependencies {', '.join(missing)}')
+            continue
         ax.set_title(title)
         fig.autofmt_xdate()
         fig.tight_layout()

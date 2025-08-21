@@ -52,6 +52,9 @@ async def parse_pcap(pcap_file):
     pcap = pyshark.FileCapture(pcap_file, include_raw=True, use_ek=True)
     await pcap.packets_from_tshark(append_pkt)
 
+    if len(rtp_data) == 0 or len(rtcp_data) == 0:
+        return pd.DataFrame(), pd.DataFrame()
+
     rtp_df = pd.DataFrame(rtp_data)
     rtp_df['time'] = pd.to_datetime(rtp_df['time'], format='ISO8601')
     rtp_df = rtp_df.set_index('time')
