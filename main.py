@@ -13,6 +13,7 @@ import parsers
 import plotters
 import html_generator
 import serializers
+import plot_version_comparison
 
 plots = [
     ('RTP Rates', plotters.plot_rtp_rates, [
@@ -101,6 +102,9 @@ async def plot_cmd(args):
 async def generate_cmd(args):
     html_generator.generate_html(args.input)
 
+async def plot_combis_cmd(args):
+    plot_version_comparison.plot_version_comparison(args.input, args.output)
+
 
 def main():
     parser = argparse.ArgumentParser(
@@ -136,6 +140,15 @@ def main():
     generate.set_defaults(func=generate_cmd)
     generate.add_argument(
         '-i', '--input', help='input directory', required=True)
+    
+    plot_combis = subparsers.add_parser(
+        'plot-combis', help='creates a combined plot for each test case')
+    plot_combis.add_argument(
+        '-i', '--input', help='input directory with test cases', required=True)
+    plot_combis.add_argument(
+        '-o', '--output', help='output directory for plots', required=True)
+    plot_combis.set_defaults(func=plot_combis_cmd)
+
     args = parser.parse_args()
     asyncio.run(args.func(args))
 
