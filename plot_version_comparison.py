@@ -67,7 +67,7 @@ def plot_delay(testtype, cases, out):
 
 def plot_send_rate(testtype, cases, out):
     legend = []
-    image_name = Path(out) / Path(f"{testtype}_send_rate.png")
+    image_name = Path(out) / Path(f"{testtype}_send-rate.png")
 
     fig, ax = plt.subplots(dpi=FIG_DPI, figsize=FIG_SIZE)
 
@@ -88,7 +88,7 @@ def plot_send_rate(testtype, cases, out):
 
 def plot_target_rate(testtype, cases, out):
     legend = []
-    image_name = Path(out) / Path(f"{testtype}_target_rate.png")
+    image_name = Path(out) / Path(f"{testtype}_target-rate.png")
 
     fig, ax = plt.subplots(dpi=FIG_DPI, figsize=FIG_SIZE)
 
