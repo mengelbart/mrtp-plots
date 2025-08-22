@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>mrtp-test dashboard</title>
+  <style>
+    .dirname {
+      font-weight: bold;
+      margin-top: 40px;
+      font-size: 1.2em;
+    }
+    .image-row {
+      display: flex;
+      gap: 10px;
+      margin-bottom: 30px;
+    }
+    .image-row img {
+      max-width: 200px;
+      height: auto;
+      border: 1px solid #ccc;
+    }
+  </style>
+</head>
+<body>
+  <h1>Plots</h1>
+  {% for entry in data %}
+  <div>
+    <div class="entry"><h2>{{ entry.name }}</h2></div>
+    <div class="image-row">
+      {% for plot in entry.plots %}
+      <img src="{{ plot }}" style="max-width:600px;">
+      {% endfor %}
+    </div>
+  </div>
+  {% endfor %}
+</body>
+</html>
