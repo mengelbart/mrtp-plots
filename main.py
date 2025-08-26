@@ -22,13 +22,13 @@ plots = [
     #  'sender.stderr.feather'], 'rtp_send_rate.png'),
     # ('RTP Recv Rate', plotters.plot_rtp_rate, [
     #  'receiver.stderr.feather'], 'rtp_recv_rate.png'),
-    ('RTP Loss Rate', plotters.plot_rtp_loss_pcap, ['ns4.rtp.feather',
+    ('RTP Loss Rate (pcap)', plotters.plot_rtp_loss_pcap, ['ns4.rtp.feather',
      'ns1.rtp.feather'], 'rtp_loss.png'),
-    ('RTP Loss Rate', plotters.plot_rtp_loss_log, ['sender.stderr.feather',
+    ('RTP Loss Rate (logging)', plotters.plot_rtp_loss_log, ['sender.stderr.feather',
      'receiver.stderr.feather'], 'rtp_loss_log.png'),
-    ('RTP OWD', plotters.plot_rtp_owd_pcap, ['ns4.rtp.feather',
+    ('RTP OWD (pcap)', plotters.plot_rtp_owd_pcap, ['ns4.rtp.feather',
      'ns1.rtp.feather'], 'rtp_owd.png'),
-    ('RTP OWD', plotters.plot_rtp_owd_log, ['sender.stderr.feather',
+    ('RTP OWD (logging)', plotters.plot_rtp_owd_log, ['sender.stderr.feather',
      'receiver.stderr.feather'], 'rtp_owd_log.png'),
     ('SCReAM Queue Delay', plotters.plot_scream_queue_delay,
      ['sender.stderr.feather'], 'scream_queue_delay.png'),
@@ -102,6 +102,7 @@ async def plot_cmd(args):
 async def generate_cmd(args):
     html_generator.generate_html(args.input)
 
+
 async def plot_combis_cmd(args):
     plot_version_comparison.plot_version_comparison(args.input, args.output)
 
@@ -140,7 +141,7 @@ def main():
     generate.set_defaults(func=generate_cmd)
     generate.add_argument(
         '-i', '--input', help='input directory', required=True)
-    
+
     plot_combis = subparsers.add_parser(
         'plot-combis', help='creates a combined plot for each test case')
     plot_combis.add_argument(
