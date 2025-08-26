@@ -271,3 +271,31 @@ def plot_gcc_usage_and_state(ax, start_time, df):
         mticker.FuncFormatter(lambda x, pos: usage_and_state.get(x, '')))
     ax.legend(loc='upper right')
     return True
+
+
+def plot_frame_sizes(ax, start_time, df):
+    encoding = df[df['msg'] == 'encoding frame']
+    encoded = df[df['msg'] == 'encoded frame']
+    decoding = df[df['msg'] == 'decoding frame']
+    decoded = df[df['msg'] == 'decoded frame']
+    plotted = False
+    if (not encoding.empty) or (not encoded.empty):
+        plotted = _plot_frame_sizes(
+            ax, encoding, 'encoding', encoded, 'encoded')
+    if not decoding.empty or not decoded.empty:
+        plotted = _plot_frame_sizes(
+            ax, decoding, 'decoding', decoded, 'decoded')
+    return plotted
+
+
+def _plot_frame_sizes(ax, df_a, label_a, df_b, label_b):
+    df_a = df_a.reset_index()
+    df_b = df_b.reset_index()
+    ax.bar(df_a.index, df_a['size'], width=0.25, label=label_a)
+    ax.bar(df_b.index+0.25, df_b['size'], width=0.25, label=label_b)
+    ax.legend(loc='upper right')
+    return True
+
+
+def plot_coding_time(ax, start_time, df):
+    pass

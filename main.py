@@ -42,6 +42,11 @@ plots = [
      'sender.stderr.feather'], 'gcc_estimates.png'),
     ('GCC Usage and State', plotters.plot_gcc_usage_and_state,
      ['sender.stderr.feather'], 'gcc_usage_state.png'),
+
+    ('Sender frame sizes', plotters.plot_frame_sizes, [
+     'sender.stderr.feather'], 'sender_frame_sizes.png'),
+    ('Receiver frame sizes', plotters.plot_frame_sizes, [
+        'receiver.stderr.feather'], 'receiver_frame_sizes.png'),
 ]
 
 
