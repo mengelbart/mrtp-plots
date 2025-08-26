@@ -83,19 +83,21 @@ def plot_rtp_rate(ax, start_time, df, label):
 def plot_rtp_loss_pcap(ax, start_time, rtp_tx_df, rtp_rx_df):
     return _plot_rtp_loss(ax, start_time, rtp_tx_df, rtp_rx_df, 'extseq')
 
+
 def plot_rtp_loss_log(ax, start_time, rtp_tx_df, rtp_rx_df):
     rtp_tx_df = rtp_tx_df[rtp_tx_df['msg'] == 'rtp packet'].copy()
     rtp_rx_df = rtp_rx_df[rtp_rx_df['msg'] == 'rtp packet'].copy()
 
     return _plot_rtp_loss(ax, start_time, rtp_tx_df, rtp_rx_df, 'rtp-packet.sequence-number')
-    
+
 
 def _plot_rtp_loss(ax, start_time, rtp_tx_df, rtp_rx_df, seq_nr_name):
     rtp_tx_df = rtp_tx_df.reset_index()
     rtp_rx_df = rtp_rx_df.reset_index()
     tx_df = rtp_tx_df[['time', seq_nr_name]]
     rx_df = rtp_rx_df[['time', seq_nr_name]]
-    merged_df = pd.merge(tx_df, rx_df, on=seq_nr_name, how='left', indicator=True)
+    merged_df = pd.merge(tx_df, rx_df, on=seq_nr_name,
+                         how='left', indicator=True)
     merged_df['tx'] = pd.to_datetime(merged_df['time_x'])
     merged_df['second'] = merged_df['tx'].dt.floor('s')
     merged_df['lost'] = merged_df['_merge'] == 'left_only'
@@ -131,7 +133,7 @@ def plot_rtp_owd_log(ax, start_time, rtp_tx_df, rtp_rx_df):
     rtp_rx_latency_df = rtp_rx_df[rtp_rx_df['msg'] == 'rtp packet'].copy()
     rtp_tx_latency_df['ts'] = pd.to_datetime(rtp_tx_latency_df['time'])
     rtp_rx_latency_df['ts'] = pd.to_datetime(rtp_rx_latency_df['time'])
-    return _plot_rtp_owd(ax, start_time, rtp_tx_latency_df, rtp_rx_latency_df, 'rtp-packet.sequence-number')
+    return _plot_rtp_owd(ax, start_time, rtp_tx_latency_df, rtp_rx_latency_df, 'rtp-packet.unwrapped-sequence-number')
 
 
 def _plot_rtp_owd(ax, start_time, rtp_tx_latency_df, rtp_rx_latency_df, seq_nr_name):
