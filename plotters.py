@@ -41,7 +41,7 @@ def plot_rtp_rates(ax, start_time, cap_df, tx_df, rx_df):
     plot_rtp_rate(ax, start_time, tx_df, 'tx')
     plot_rtp_rate(ax, start_time, rx_df, 'rx')
     plot_target_rate(ax, start_time, tx_df)
-    ax.set_ylim(bottom=0, top=6e6)
+    # ax.set_ylim(bottom=0, top=6e6)
     ax.set_xlabel('Time')
     ax.set_ylabel('Rate')
     ax.xaxis.set_major_formatter(
@@ -142,7 +142,7 @@ def _plot_rtp_owd(ax, start_time, rtp_tx_latency_df, rtp_rx_latency_df, seq_nr_n
         datetime.timedelta(milliseconds=1) / 1000.0
     df = set_start_time_index(merged_df, start_time, 'ts_x')
     ax.plot(df.index, df['latency'], label='Latency', linewidth=0.5)
-    ax.set_ylim(bottom=0, top=0.5)
+    # ax.set_ylim(bottom=0, top=0.5)
     ax.set_xlabel('Time')
     ax.set_ylabel('Latency')
     ax.xaxis.set_major_formatter(
