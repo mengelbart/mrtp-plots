@@ -52,6 +52,9 @@ plots = [
      'sender.stderr.feather'], 'encoding_time.png'),
     ('Decoding time', plotters.plot_decoding_time, [
      'receiver.stderr.feather'], 'decoding_time.png'),
+
+    ('E2E Latency', plotters.plot_e2e_latency, [
+     'sender.stderr.feather', 'receiver.stderr.feather'], 'e2e_latency.png'),
 ]
 
 
