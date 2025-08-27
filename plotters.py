@@ -273,19 +273,22 @@ def plot_gcc_usage_and_state(ax, start_time, df):
     return True
 
 
-def plot_frame_sizes(ax, start_time, df):
-    encoding = df[df['msg'] == 'encoding frame']
-    encoded = df[df['msg'] == 'encoded frame']
+def plot_encoding_frame_size(ax, start_time, df):
     decoding = df[df['msg'] == 'decoding frame']
     decoded = df[df['msg'] == 'decoded frame']
-    plotted = False
-    if (not encoding.empty) or (not encoded.empty):
-        plotted = _plot_frame_sizes(
-            ax, encoding, 'encoding', encoded, 'encoded')
-    if not decoding.empty or not decoded.empty:
-        plotted = _plot_frame_sizes(
-            ax, decoding, 'decoding', decoded, 'decoded')
-    return plotted
+    if decoding.empty and decoded.empty:
+        return False
+    _plot_frame_sizes(ax, decoding, 'encoded', decoded, 'raw')
+    return True
+
+
+def plot_decoding_frame_size(ax, start_time, df):
+    encoding = df[df['msg'] == 'encoding frame']
+    encoded = df[df['msg'] == 'encoded frame']
+    if encoding.empty and encoded.empty:
+        return False
+    _plot_frame_sizes(ax, encoding, 'raw', encoded, 'encoded')
+    return True
 
 
 def _plot_frame_sizes(ax, df_a, label_a, df_b, label_b):
@@ -297,5 +300,33 @@ def _plot_frame_sizes(ax, df_a, label_a, df_b, label_b):
     return True
 
 
-def plot_coding_time(ax, start_time, df):
-    pass
+def plot_encoding_time(ax, start_time, df):
+    encoding = df[df['msg'] == 'encoding frame']
+    encoded = df[df['msg'] == 'encoded frame']
+    if encoding.empty and encoded.empty:
+        return False
+    _plot_encoding_time(ax, encoding, encoded)
+    return True
+
+
+def plot_decoding_time(ax, start_time, df):
+    decoding = df[df['msg'] == 'decoding frame']
+    decoded = df[df['msg'] == 'decoded frame']
+    if decoding.empty and decoded.empty:
+        return False
+    _plot_encoding_time(ax, decoding, decoded)
+    return True
+
+
+def _plot_encoding_time(ax, df_a, df_b):
+    df_a = df_a.reset_index()
+    df_b = df_b.reset_index()
+    print(df_a)
+    print(df_b)
+    df = pd.merge(df_a, df_b, left_index=True, right_index=True)
+    df['latency'] = (pd.to_datetime(df['time_y'])-pd.to_datetime(df['time_x'])) / \
+        datetime.timedelta(milliseconds=1) / 1000.0
+    print(df[['index_x', 'index_y', 'time_x', 'time_y', 'latency']])
+    ax.bar(df.index, df['latency'], label='Encoding latency')
+    ax.yaxis.set_major_formatter(mticker.EngFormatter(unit='s'))
+    ax.legend(loc='upper right')

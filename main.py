@@ -43,10 +43,15 @@ plots = [
     ('GCC Usage and State', plotters.plot_gcc_usage_and_state,
      ['sender.stderr.feather'], 'gcc_usage_state.png'),
 
-    ('Sender frame sizes', plotters.plot_frame_sizes, [
-     'sender.stderr.feather'], 'sender_frame_sizes.png'),
-    ('Receiver frame sizes', plotters.plot_frame_sizes, [
+    ('Encoding frame sizes', plotters.plot_encoding_frame_size, [
+     'sender.stderr.feather'], 'encoding_frame_sizes.png'),
+    ('Decoding frame sizes', plotters.plot_decoding_frame_size, [
         'receiver.stderr.feather'], 'receiver_frame_sizes.png'),
+
+    ('Encoding time', plotters.plot_encoding_time, [
+     'sender.stderr.feather'], 'encoding_time.png'),
+    ('Decoding time', plotters.plot_decoding_time, [
+     'receiver.stderr.feather'], 'decoding_time.png'),
 ]
 
 
