@@ -141,7 +141,6 @@ def _plot_rtp_owd(ax, start_time, rtp_tx_latency_df, rtp_rx_latency_df, seq_nr_n
     merged_df['latency'] = (merged_df['ts_y'] - merged_df['ts_x']) / \
         datetime.timedelta(milliseconds=1) / 1000.0
     df = set_start_time_index(merged_df, start_time, 'ts_x')
-    print(df[['ts_x', 'ts_y', 'latency']])
     ax.plot(df.index, df['latency'], label='Latency', linewidth=0.5)
     # ax.set_ylim(bottom=0, top=0.5)
     ax.set_xlabel('Time')
