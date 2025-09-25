@@ -25,7 +25,7 @@ async def parse_pcap(pcap_file):
     rtcp_data = []
 
     def append_pkt(packet):
-        if 'UDP' in packet and 'RTP' in packet:
+        if 'UDP' in packet and 'RTP' in packet and packet['rtp'].version == 2:
             rtp_data.append({
                 'time': packet.frame_info.time_epoch,
                 'src': packet['ip'].src.value,

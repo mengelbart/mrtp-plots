@@ -26,13 +26,13 @@ plots = [
     #  'sender.stderr.feather'], 'rtp_send_rate.png'),
     # ('RTP Recv Rate', plotters.plot_rtp_rate, [
     #  'receiver.stderr.feather'], 'rtp_recv_rate.png'),
-    ('RTP Loss Rate', plotters.plot_rtp_loss_pcap, ['ns4.rtp.feather',
+    ('RTP Loss Rate (pcap)', plotters.plot_rtp_loss_pcap, ['ns4.rtp.feather',
      'ns1.rtp.feather'], 'rtp_loss.png'),
-    ('RTP Loss Rate', plotters.plot_rtp_loss_log, ['sender.stderr.feather',
+    ('RTP Loss Rate (logging)', plotters.plot_rtp_loss_log, ['sender.stderr.feather',
      'receiver.stderr.feather'], 'rtp_loss_log.png'),
-    ('RTP OWD', plotters.plot_rtp_owd_pcap, ['ns4.rtp.feather',
+    ('RTP OWD (pcap)', plotters.plot_rtp_owd_pcap, ['ns4.rtp.feather',
      'ns1.rtp.feather'], 'rtp_owd.png'),
-    ('RTP OWD', plotters.plot_rtp_owd_log, ['sender.stderr.feather',
+    ('RTP OWD (logging)', plotters.plot_rtp_owd_log, ['sender.stderr.feather',
      'receiver.stderr.feather'], 'rtp_owd_log.png'),
     ('SCReAM Queue Delay', plotters.plot_scream_queue_delay,
      ['sender.stderr.feather'], 'scream_queue_delay.png'),
@@ -46,6 +46,19 @@ plots = [
      'sender.stderr.feather'], 'gcc_estimates.png'),
     ('GCC Usage and State', plotters.plot_gcc_usage_and_state,
      ['sender.stderr.feather'], 'gcc_usage_state.png'),
+
+    ('Encoding frame sizes', plotters.plot_encoding_frame_size, [
+     'sender.stderr.feather'], 'encoding_frame_sizes.png'),
+    ('Decoding frame sizes', plotters.plot_decoding_frame_size, [
+        'receiver.stderr.feather'], 'receiver_frame_sizes.png'),
+
+    ('Encoding time', plotters.plot_encoding_time, [
+     'sender.stderr.feather'], 'encoding_time.png'),
+    ('Decoding time', plotters.plot_decoding_time, [
+     'receiver.stderr.feather'], 'decoding_time.png'),
+
+    ('E2E Latency', plotters.plot_e2e_latency, [
+     'sender.stderr.feather', 'receiver.stderr.feather'], 'e2e_latency.png'),
 ]
 
 
@@ -106,6 +119,7 @@ async def plot_cmd(args):
 async def generate_cmd(args):
     html_generator.generate_html(args.input)
 
+
 async def plot_combis_cmd(args):
     plot_version_comparison.plot_version_comparison(args.input, args.output)
 
@@ -144,7 +158,7 @@ def main():
     generate.set_defaults(func=generate_cmd)
     generate.add_argument(
         '-i', '--input', help='input directory', required=True)
-    
+
     plot_combis = subparsers.add_parser(
         'plot-combis', help='creates a combined plot for each test case')
     plot_combis.add_argument(

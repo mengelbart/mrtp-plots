@@ -83,7 +83,7 @@ def plot_all_recv_rates(ax, start_time, cap_df, tx_df, rx_df):
     return True
 
 def rate_plot_ax_config(ax):
-    ax.set_ylim(bottom=0, top=6e6)
+    # ax.set_ylim(bottom=0, top=6e6)
     ax.set_xlabel('Time')
     ax.set_ylabel('Rate')
     ax.xaxis.set_major_formatter(
@@ -92,11 +92,11 @@ def rate_plot_ax_config(ax):
     ax.legend(loc='upper right')
 
 def plot_capacity(ax, start_time, df):
-    df['rate'] = df['bandwidth'].apply(parse_rate)
-    df = set_start_time_index(df, start_time, 'time')
-    ax.step(df.index, df['rate'], where='post',
-            label='capacity', linewidth=0.5, color="lightskyblue")
-    return True
+    if not df.empty:
+        df['rate'] = df['bandwidth'].apply(parse_rate)
+        df = set_start_time_index(df, start_time, 'time')
+        ax.step(df.index, df['rate'], where='post',
+                label='capacity', linewidth=0.5, color="lightskyblue")
 
 
 def plot_target_rate(ax, start_time, df, event_name='NEW_TARGET_MEDIA_RATE'):
@@ -140,12 +140,13 @@ def _plot_data_rate(ax, start_time, df, label):
 def plot_rtp_loss_pcap(ax, start_time, rtp_tx_df, rtp_rx_df):
     return _plot_rtp_loss(ax, start_time, rtp_tx_df, rtp_rx_df, 'extseq')
 
+
 def plot_rtp_loss_log(ax, start_time, rtp_tx_df, rtp_rx_df):
     rtp_tx_df = rtp_tx_df[rtp_tx_df['msg'] == 'rtp packet'].copy()
     rtp_rx_df = rtp_rx_df[rtp_rx_df['msg'] == 'rtp packet'].copy()
 
     return _plot_rtp_loss(ax, start_time, rtp_tx_df, rtp_rx_df, 'rtp-packet.sequence-number')
-    
+
 
 def _plot_rtp_loss(ax, start_time, rtp_tx_df, rtp_rx_df, seq_nr_name):
     if rtp_tx_df.empty:
@@ -157,7 +158,8 @@ def _plot_rtp_loss(ax, start_time, rtp_tx_df, rtp_rx_df, seq_nr_name):
     rtp_rx_df = rtp_rx_df.reset_index()
     tx_df = rtp_tx_df[['time', seq_nr_name]]
     rx_df = rtp_rx_df[['time', seq_nr_name]]
-    merged_df = pd.merge(tx_df, rx_df, on=seq_nr_name, how='left', indicator=True)
+    merged_df = pd.merge(tx_df, rx_df, on=seq_nr_name,
+                         how='left', indicator=True)
     merged_df['tx'] = pd.to_datetime(merged_df['time_x'])
     merged_df['second'] = merged_df['tx'].dt.floor('s')
     merged_df['lost'] = merged_df['_merge'] == 'left_only'
@@ -197,7 +199,7 @@ def plot_rtp_owd_log(ax, start_time, rtp_tx_df, rtp_rx_df):
 
     rtp_tx_latency_df['ts'] = pd.to_datetime(rtp_tx_latency_df['time'])
     rtp_rx_latency_df['ts'] = pd.to_datetime(rtp_rx_latency_df['time'])
-    return _plot_rtp_owd(ax, start_time, rtp_tx_latency_df, rtp_rx_latency_df, 'rtp-packet.sequence-number')
+    return _plot_rtp_owd(ax, start_time, rtp_tx_latency_df, rtp_rx_latency_df, 'rtp-packet.unwrapped-sequence-number')
 
 
 def _plot_rtp_owd(ax, start_time, rtp_tx_latency_df, rtp_rx_latency_df, seq_nr_name):
@@ -206,7 +208,7 @@ def _plot_rtp_owd(ax, start_time, rtp_tx_latency_df, rtp_rx_latency_df, seq_nr_n
         datetime.timedelta(milliseconds=1) / 1000.0
     df = set_start_time_index(merged_df, start_time, 'ts_x')
     ax.plot(df.index, df['latency'], label='Latency', linewidth=0.5)
-    ax.set_ylim(bottom=0, top=0.5)
+    # ax.set_ylim(bottom=0, top=0.5)
     ax.set_xlabel('Time')
     ax.set_ylabel('Latency')
     ax.xaxis.set_major_formatter(
@@ -333,5 +335,77 @@ def plot_gcc_usage_and_state(ax, start_time, df):
         mticker.FuncFormatter(lambda x, pos: f'{x:.0f}s'))
     ax.yaxis.set_major_formatter(
         mticker.FuncFormatter(lambda x, pos: usage_and_state.get(x, '')))
+    ax.legend(loc='upper right')
+    return True
+
+
+def plot_encoding_frame_size(ax, start_time, df):
+    encoding = df[df['msg'] == 'encoding frame']
+    encoded = df[df['msg'] == 'encoded frame']
+    if encoding.empty and encoded.empty:
+        return False
+    _plot_frame_sizes(ax, encoding, 'raw', encoded, 'encoded')
+    return True
+
+
+def plot_decoding_frame_size(ax, start_time, df):
+    decoding = df[df['msg'] == 'decoding frame']
+    decoded = df[df['msg'] == 'decoded frame']
+    if decoding.empty and decoded.empty:
+        return False
+    _plot_frame_sizes(ax, decoding, 'encoded', decoded, 'raw')
+    return True
+
+
+def _plot_frame_sizes(ax, df_a, label_a, df_b, label_b):
+    df_a = df_a.reset_index()
+    df_b = df_b.reset_index()
+    ax.bar(df_a.index, df_a['size'], width=0.25, label=label_a)
+    ax.bar(df_b.index+0.25, df_b['size'], width=0.25, label=label_b)
+    ax.legend(loc='upper right')
+    return True
+
+
+def plot_encoding_time(ax, start_time, df):
+    encoding = df[df['msg'] == 'encoding frame']
+    encoded = df[df['msg'] == 'encoded frame']
+    if encoding.empty and encoded.empty:
+        return False
+    _plot_encoding_time(ax, encoding, encoded)
+    return True
+
+
+def plot_decoding_time(ax, start_time, df):
+    decoding = df[df['msg'] == 'decoding frame']
+    decoded = df[df['msg'] == 'decoded frame']
+    if decoding.empty and decoded.empty:
+        return False
+    _plot_encoding_time(ax, decoding, decoded)
+    return True
+
+
+def _plot_encoding_time(ax, df_a, df_b):
+    df_a = df_a.reset_index()
+    df_b = df_b.reset_index()
+    df = pd.merge(df_a, df_b, left_index=True, right_index=True)
+    df['latency'] = (pd.to_datetime(df['time_y'])-pd.to_datetime(df['time_x'])) / \
+        datetime.timedelta(milliseconds=1) / 1000.0
+    ax.bar(df.index, df['latency'], label='Encoding latency')
+    ax.yaxis.set_major_formatter(mticker.EngFormatter(unit='s'))
+    ax.legend(loc='upper right')
+
+
+def plot_e2e_latency(ax, start_time, encoding_df, decoding_df):
+    encoding = encoding_df[encoding_df['msg']
+                           == 'encoding frame'].reset_index()
+    decoding = decoding_df[decoding_df['msg']
+                           == 'decoded frame'].reset_index()
+    if encoding.empty and decoding.empty:
+        return False
+    df = pd.merge(encoding, decoding, left_index=True, right_index=True)
+    df['latency'] = (pd.to_datetime(df['time_y'])-pd.to_datetime(df['time_x'])) / \
+        datetime.timedelta(milliseconds=1) / 1000.0
+    ax.bar(df.index, df['latency'], label='E2E Latency')
+    ax.yaxis.set_major_formatter(mticker.EngFormatter(unit='s'))
     ax.legend(loc='upper right')
     return True
