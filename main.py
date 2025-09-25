@@ -18,6 +18,10 @@ import plot_version_comparison
 plots = [
     ('RTP Rates', plotters.plot_rtp_rates, [
      'tc.feather', 'sender.stderr.feather', 'receiver.stderr.feather'], 'rtp_rates.png'),
+    ('Send Rates', plotters.plot_all_send_rates, [
+     'tc.feather', 'sender.stderr.feather'], 'all_send_rates.png'),
+     ('Receive Rates', plotters.plot_all_recv_rates, [
+     'tc.feather', 'sender.stderr.feather', 'receiver.stderr.feather'], 'all_recv_rates.png'),
     # ('RTP Send Rate', plotters.plot_rtp_rate, [
     #  'sender.stderr.feather'], 'rtp_send_rate.png'),
     # ('RTP Recv Rate', plotters.plot_rtp_rate, [
