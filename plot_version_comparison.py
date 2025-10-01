@@ -20,7 +20,8 @@ def _save_delay_graph(ax, fig, image_path, legend, yname):
     ax.legend(legend)
     ax.set_ylabel(yname)
     ax.set_xlabel("Time")
-    ax.xaxis.set_major_formatter(mticker.FuncFormatter(lambda x, pos: f"{x:.0f}s"))
+    ax.xaxis.set_major_formatter(
+        mticker.FuncFormatter(lambda x, pos: f"{x:.0f}s"))
     ax.set_title(image_path.name.split("/")[-1].replace(".png", ""))
 
     fig.tight_layout()
@@ -53,14 +54,33 @@ def plot_delay(testtype, cases, out):
     for case in cases:
         start_time = _get_start_time(case[1])
 
-        feather_sender = f"{case[1]}/sender.stderr.feather"
-        df_sender = serializers.read_feather(feather_sender)
-        feather_recv = f"{case[1]}/receiver.stderr.feather"
-        df_recv = serializers.read_feather(feather_recv)
+        feather_sender = Path(case[1]) / Path("sender.stderr.feather")
+        feather_recv = Path(case[1]) / Path("receiver.stderr.feather")
 
-        plotters.plot_rtp_owd_log(ax, start_time, df_sender, df_recv)
+        if feather_sender.is_file() and feather_recv.is_file():
+            df_recv = serializers.read_feather(feather_recv)
+            df_sender = serializers.read_feather(feather_sender)
 
-        legend.append(case[2])
+            plotted = plotters.plot_rtp_owd_log(
+                ax, start_time, df_sender, df_recv)
+
+            if plotted:
+                legend.append(case[2] + " rtp")
+                continue  # TODO: plot both?
+
+        qlog_tx_feather = Path(case[1]) / Path("sender.feather")
+        qlog_rx_feater = Path(case[1]) / Path("receiver.feather")
+
+        if qlog_tx_feather.is_file() and qlog_rx_feater.is_file():
+            qlog_tx_df = serializers.read_feather(qlog_tx_feather)
+            qlog_rx_df = serializers.read_feather(qlog_rx_feater)
+
+            plotted = plotters.plot_qloq_owd(
+                ax, start_time, qlog_tx_df, qlog_rx_df
+            )
+
+            if plotted:
+                legend.append(case[2] + " qlog")
 
     _save_delay_graph(ax, fig, image_name, legend, "Latency")
 
@@ -78,10 +98,16 @@ def plot_send_rate(testtype, cases, out):
     for case in cases:
         start_time = _get_start_time(case[1])
 
-        feather_file = f"{case[1]}/sender.stderr.feather"
-        df = serializers.read_feather(feather_file)
-        plotters.plot_rtp_rate(ax, start_time, df, case[2])
-        legend.append(case[2])
+        feather_file = Path(case[1]) / Path("sender.stderr.feather")
+        if feather_file.is_file():
+            df = serializers.read_feather(feather_file)
+            plotted = plotters.plot_rtp_rate(ax, start_time, df, case[2])
+            if plotted:
+                legend.append(case[2] + " rtp")
+
+            plotted = plotters.plot_data_rate(ax, start_time, df, case[2])
+            if plotted:
+                legend.append(case[2] + " qlog")
 
     _save_rate_graph(ax, fig, image_name, legend, "Rate")
 
@@ -101,7 +127,8 @@ def plot_target_rate(testtype, cases, out):
 
         feather_file = f"{case[1]}/sender.stderr.feather"
         df = serializers.read_feather(feather_file)
-        plotters.plot_target_rate(ax, start_time, df)
+        plotters.plot_target_rate(
+            ax, start_time, df, event_name="NEW_TARGET_RATE")
 
         legend.append(case[2])
 
@@ -128,7 +155,8 @@ def plot_it(testcases, out):
 
     # plot for each test type
     for testtype in testtypes:
-        cases = list(filter(lambda case: case[0] == testtype, sorted_testcases))
+        cases = list(
+            filter(lambda case: case[0] == testtype, sorted_testcases))
         plot_everything(testtype, cases, out)
 
 
@@ -141,7 +169,8 @@ def get_all_iter_testcases(dir: str):
         if test_iteration.is_dir():
             for test_case in test_iteration.iterdir():
                 if test_case.is_dir():
-                    testcase = (test_case.name, str(test_case), test_iteration.name)
+                    testcase = (test_case.name, str(
+                        test_case), test_iteration.name)
                     testcases.append(testcase)
 
     return testcases

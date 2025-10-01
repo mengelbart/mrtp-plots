@@ -1,4 +1,5 @@
 import json
+from math import log
 
 import pandas as pd
 import pyshark
@@ -6,18 +7,35 @@ import pyshark
 
 def parse_json_log(log_file):
     with open(log_file, 'r') as f:
-        data = []
-        for line in f:
-            line = line.strip()
-            if not line:
-                continue
-            try:
-                data.append(json.loads(line))
-            except json.JSONDecodeError:
-                continue
+        data = _read_json_lines(f)
 
     df = pd.json_normalize(data)
     return df
+
+
+def parse_qlog(log_file):
+    with open(log_file, 'r') as f:
+        data = _read_json_lines(f)
+
+    reference_time = data[0]['trace']["common_fields"]['reference_time']
+    df = pd.json_normalize(data)
+
+    # add reference time to all relative timestamps
+    df["time"] = pd.to_datetime(df["time"] + reference_time, unit="ms")
+    return df
+
+
+def _read_json_lines(log_file):
+    data = []
+    for line in log_file:
+        line = line.strip()
+        if not line:
+            continue
+        try:
+            data.append(json.loads(line))
+        except json.JSONDecodeError:
+            continue
+    return data
 
 
 async def parse_pcap(pcap_file):
