@@ -34,6 +34,8 @@ plots = [
      'ns1.rtp.feather'], 'rtp_owd.png'),
     ('RTP OWD (logging)', plotters.plot_rtp_owd_log, ['sender.stderr.feather',
      'receiver.stderr.feather'], 'rtp_owd_log.png'),
+    ('QUIC OWD', plotters.plot_qloq_owd, ['sender.feather', 
+     'receiver.feather'], 'quic_owd.png'),
     ('SCReAM Queue Delay', plotters.plot_scream_queue_delay,
      ['sender.stderr.feather'], 'scream_queue_delay.png'),
     ('SCReAM CWND', plotters.plot_scream_cwnd, [
@@ -66,6 +68,10 @@ async def parse_file(input, out_dir):
     path = Path(input)
     if path.name in ['config.json', 'tc.log', 'receiver.stderr.log', 'sender.stderr.log']:
         df = parsers.parse_json_log(input)
+        serializers.write_feather(
+            df, Path(out_dir) / Path(input).with_suffix('.feather').name)
+    if path.name in ['sender.qlog', 'receiver.qlog']:
+        df = parsers.parse_qlog(input)
         serializers.write_feather(
             df, Path(out_dir) / Path(input).with_suffix('.feather').name)
     if path.suffix == '.pcap':
