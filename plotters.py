@@ -41,6 +41,60 @@ def plot_rtp_rates(ax, start_time, cap_df, tx_df, rx_df):
     plot_rtp_rate(ax, start_time, tx_df, 'tx')
     plot_rtp_rate(ax, start_time, rx_df, 'rx')
     plot_target_rate(ax, start_time, tx_df)
+    rate_plot_ax_config(ax)
+    return True
+
+
+def plot_all_send_rates(ax, start_time, cap_df, tx_df):
+    plot_capacity(ax, start_time, cap_df)
+    tr_plotted = plot_target_rate(
+        ax, start_time, tx_df, event_name='NEW_TARGET_RATE')
+    tx_data_plotted, data_df = plot_data_rate(ax, start_time, tx_df, 'data')
+
+    # only plot if data was sent
+    if not tx_data_plotted or not tr_plotted:
+        return False
+
+    _, media_df = plot_rtp_rate(ax, start_time, tx_df, 'media')
+
+    # sum graph
+    combined_df = data_df.join(
+        media_df, how='outer', lsuffix='_data', rsuffix='_media')
+    combined_df['rate'] = combined_df.get(
+        'rate_data', 0) + combined_df.get('rate_media', 0)
+    ax.plot(combined_df.index,
+            combined_df['rate'], label='total', linewidth=0.5)
+
+    rate_plot_ax_config(ax)
+    return True
+
+
+def plot_all_recv_rates(ax, start_time, cap_df, tx_df, rx_df):
+    plot_capacity(ax, start_time, cap_df)
+    tr_plotted = plot_target_rate(
+        ax, start_time, tx_df, event_name='NEW_TARGET_RATE')
+    rx_plotted, data_df = plot_data_rate(
+        ax, start_time, rx_df, 'data', event_name='DataSink received data')
+
+    # only plot if data was sent
+    if not rx_plotted or not tr_plotted:
+        return False
+
+    _, media_df = plot_rtp_rate(ax, start_time, rx_df, 'media')
+
+    # sum graph
+    combined_df = data_df.join(
+        media_df, how='outer', lsuffix='_data', rsuffix='_media')
+    combined_df['rate'] = combined_df.get(
+        'rate_data', 0) + combined_df.get('rate_media', 0)
+    ax.plot(combined_df.index,
+            combined_df['rate'], label='total', linewidth=0.5)
+
+    rate_plot_ax_config(ax)
+    return True
+
+
+def rate_plot_ax_config(ax):
     # ax.set_ylim(bottom=0, top=6e6)
     ax.set_xlabel('Time')
     ax.set_ylabel('Rate')
@@ -48,7 +102,6 @@ def plot_rtp_rates(ax, start_time, cap_df, tx_df, rx_df):
         mticker.FuncFormatter(lambda x, pos: f'{x:.0f}s'))
     ax.yaxis.set_major_formatter(mticker.EngFormatter(unit='bit/s'))
     ax.legend(loc='upper right')
-    return True
 
 
 def plot_capacity(ax, start_time, df):
@@ -56,13 +109,13 @@ def plot_capacity(ax, start_time, df):
         df['rate'] = df['bandwidth'].apply(parse_rate)
         df = set_start_time_index(df, start_time, 'time')
         ax.step(df.index, df['rate'], where='post',
-                label='capacity', linewidth=0.5)
+                label='capacity', linewidth=0.5, color="lightskyblue")
 
 
-def plot_target_rate(ax, start_time, df):
-    df = df[df['msg'] == 'NEW_TARGET_RATE'].copy()
+def plot_target_rate(ax, start_time, df, event_name='NEW_TARGET_MEDIA_RATE'):
+    df = df[df['msg'] == event_name].copy()
     if df.empty:
-        return
+        return False
     df = set_start_time_index(df, start_time, 'time')
     ax.plot(df.index, df['rate'], label='target', linewidth=0.5)
     return True
@@ -70,14 +123,33 @@ def plot_target_rate(ax, start_time, df):
 
 def plot_rtp_rate(ax, start_time, df, label):
     df = df[df['msg'] == 'rtp packet'].copy()
+    if df.empty:
+        return False, df
+
     df['rate'] = df['rtp-packet.payload-length'] * 80
+
+    return _plot_data_rate(ax, start_time, df, label)
+
+
+def plot_data_rate(ax, start_time, df, label, event_name='DataSource sent data'):
+    df = df[df['msg'] == event_name].copy()
+    if df.empty:
+        return False, df
+
+    df['rate'] = df['payload-length'] * 80
+
+    return _plot_data_rate(ax, start_time, df, label)
+
+
+def _plot_data_rate(ax, start_time, df, label):
     df['timestamp'] = pd.to_datetime(df['time'])
     df.set_index('timestamp', inplace=True)
     df = df.resample('100ms').sum().copy()
     df['second'] = (df.index - start_time).total_seconds()
     df.set_index('second', inplace=True)
     ax.plot(df.index, df['rate'], label=label, linewidth=0.5)
-    return True
+
+    return True, df
 
 
 def plot_rtp_loss_pcap(ax, start_time, rtp_tx_df, rtp_rx_df):
@@ -92,6 +164,11 @@ def plot_rtp_loss_log(ax, start_time, rtp_tx_df, rtp_rx_df):
 
 
 def _plot_rtp_loss(ax, start_time, rtp_tx_df, rtp_rx_df, seq_nr_name):
+    if rtp_tx_df.empty:
+        return False
+    if rtp_rx_df.empty:
+        rtp_rx_df = pd.DataFrame(columns=rtp_tx_df.columns)
+
     rtp_tx_df = rtp_tx_df.reset_index()
     rtp_rx_df = rtp_rx_df.reset_index()
     tx_df = rtp_tx_df[['time', seq_nr_name]]
@@ -125,18 +202,44 @@ def plot_rtp_owd_pcap(ax, start_time, rtp_tx_df, rtp_rx_df):
     rtp_rx_latency_df = rtp_rx_df.copy()
     rtp_tx_latency_df['ts'] = rtp_tx_df.index
     rtp_rx_latency_df['ts'] = rtp_rx_df.index
-    return _plot_rtp_owd(ax, start_time, rtp_tx_latency_df, rtp_rx_latency_df, 'extseq')
+    return _plot_owd(ax, start_time, rtp_tx_latency_df, rtp_rx_latency_df, 'extseq')
+
+
+def plot_qloq_owd(ax, start_time, qlog_tx_df, qlog_rx_df):
+    quic_tx_latency_df = qlog_tx_df[qlog_tx_df['name']
+                                    == 'transport:packet_sent'].copy()
+    quic_rx_latency_df = qlog_rx_df[qlog_rx_df['name']
+                                    == 'transport:packet_received'].copy()
+
+    tzinfo = getattr(start_time, 'tzinfo', None)
+
+    if quic_tx_latency_df.empty or quic_rx_latency_df.empty:
+        return False
+
+    quic_tx_latency_df['time'] = quic_tx_latency_df['time'].dt.tz_localize(
+        'UTC').dt.tz_convert(tzinfo)
+    quic_rx_latency_df['time'] = quic_rx_latency_df['time'].dt.tz_localize(
+        'UTC').dt.tz_convert(tzinfo)
+
+    quic_tx_latency_df['ts'] = quic_tx_latency_df['time']
+    quic_rx_latency_df['ts'] = quic_rx_latency_df['time']
+
+    return _plot_owd(ax, start_time, quic_tx_latency_df, quic_rx_latency_df, 'data.header.packet_number')
 
 
 def plot_rtp_owd_log(ax, start_time, rtp_tx_df, rtp_rx_df):
     rtp_tx_latency_df = rtp_tx_df[rtp_tx_df['msg'] == 'rtp packet'].copy()
     rtp_rx_latency_df = rtp_rx_df[rtp_rx_df['msg'] == 'rtp packet'].copy()
+
+    if rtp_tx_latency_df.empty or rtp_rx_latency_df.empty:
+        return False
+
     rtp_tx_latency_df['ts'] = pd.to_datetime(rtp_tx_latency_df['time'])
     rtp_rx_latency_df['ts'] = pd.to_datetime(rtp_rx_latency_df['time'])
-    return _plot_rtp_owd(ax, start_time, rtp_tx_latency_df, rtp_rx_latency_df, 'rtp-packet.unwrapped-sequence-number')
+    return _plot_owd(ax, start_time, rtp_tx_latency_df, rtp_rx_latency_df, 'rtp-packet.unwrapped-sequence-number')
 
 
-def _plot_rtp_owd(ax, start_time, rtp_tx_latency_df, rtp_rx_latency_df, seq_nr_name):
+def _plot_owd(ax, start_time, rtp_tx_latency_df, rtp_rx_latency_df, seq_nr_name):
     merged_df = rtp_tx_latency_df.merge(rtp_rx_latency_df, on=seq_nr_name)
     merged_df['latency'] = (merged_df['ts_y'] - merged_df['ts_x']) / \
         datetime.timedelta(milliseconds=1) / 1000.0
