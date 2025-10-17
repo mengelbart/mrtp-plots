@@ -1,7 +1,7 @@
 import datetime
+import re
 import matplotlib.ticker as mticker
 import pandas as pd
-import re
 
 unit_multipliers = {
     'bit': 1,
@@ -47,12 +47,12 @@ def plot_rtp_rates(ax, start_time, cap_df, tx_df, rx_df):
 
 def plot_all_send_rates(ax, start_time, cap_df, tx_df):
     plot_capacity(ax, start_time, cap_df)
-    tr_plotted = plot_target_rate(
+    plot_target_rate(
         ax, start_time, tx_df, event_name='NEW_TARGET_RATE')
     tx_data_plotted, data_df = plot_data_rate(ax, start_time, tx_df, 'data')
 
     # only plot if data was sent
-    if not tx_data_plotted or not tr_plotted:
+    if not tx_data_plotted:
         return False
 
     _, media_df = plot_rtp_rate(ax, start_time, tx_df, 'media')
@@ -71,13 +71,13 @@ def plot_all_send_rates(ax, start_time, cap_df, tx_df):
 
 def plot_all_recv_rates(ax, start_time, cap_df, tx_df, rx_df):
     plot_capacity(ax, start_time, cap_df)
-    tr_plotted = plot_target_rate(
+    plot_target_rate(
         ax, start_time, tx_df, event_name='NEW_TARGET_RATE')
     rx_plotted, data_df = plot_data_rate(
         ax, start_time, rx_df, 'data', event_name='DataSink received data')
 
     # only plot if data was sent
-    if not rx_plotted or not tr_plotted:
+    if not rx_plotted:
         return False
 
     _, media_df = plot_rtp_rate(ax, start_time, rx_df, 'media')
@@ -372,6 +372,35 @@ def plot_gcc_usage_and_state(ax, start_time, df):
         mticker.FuncFormatter(lambda x, pos: f'{x:.0f}s'))
     ax.yaxis.set_major_formatter(
         mticker.FuncFormatter(lambda x, pos: usage_and_state.get(x, '')))
+    ax.legend(loc='upper right')
+    return True
+
+
+def plot_sctp_stats(ax, start_time, df):
+    if df.empty:
+        return False
+
+    df = df[df['msg'] == 'pion-sctp-cwnd'].copy()
+    if df.empty:
+        return False
+
+    # Ensure 'time' is pandas Timestamp, then add start_time (also a pd.Timestamp)
+    df['time'] = pd.to_datetime(df['pion-time'])
+    df['time'] = df['time'].dt.tz_localize('UTC')
+
+    # Add only the day of start_time to each timestamp
+    day_offset = pd.Timestamp(start_time.date())
+    df['time'] = df['time'].apply(lambda t: t.replace(
+        year=day_offset.year, month=day_offset.month, day=day_offset.day))
+
+    df = set_start_time_index(df, start_time, 'time')
+    ax.step(df.index, df['cwnd'], where='post',
+            label='sctp cwnd', linewidth=0.5)
+    ax.set_xlabel('Time')
+    ax.set_ylabel('Size')
+    ax.xaxis.set_major_formatter(
+        mticker.FuncFormatter(lambda x, pos: f'{x:.0f}s'))
+    # ax.yaxis.set_major_formatter(mticker.EngFormatter(unit='B'))
     ax.legend(loc='upper right')
     return True
 

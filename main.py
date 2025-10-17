@@ -20,7 +20,7 @@ plots = [
      'tc.feather', 'sender.stderr.feather', 'receiver.stderr.feather'], 'rtp_rates.png'),
     ('Send Rates', plotters.plot_all_send_rates, [
      'tc.feather', 'sender.stderr.feather'], 'all_send_rates.png'),
-     ('Receive Rates', plotters.plot_all_recv_rates, [
+    ('Receive Rates', plotters.plot_all_recv_rates, [
      'tc.feather', 'sender.stderr.feather', 'receiver.stderr.feather'], 'all_recv_rates.png'),
     # ('RTP Send Rate', plotters.plot_rtp_rate, [
     #  'sender.stderr.feather'], 'rtp_send_rate.png'),
@@ -34,7 +34,7 @@ plots = [
      'ns1.rtp.feather'], 'rtp_owd.png'),
     ('RTP OWD (logging)', plotters.plot_rtp_owd_log, ['sender.stderr.feather',
      'receiver.stderr.feather'], 'rtp_owd_log.png'),
-    ('QUIC OWD', plotters.plot_qloq_owd, ['sender.feather', 
+    ('QUIC OWD', plotters.plot_qloq_owd, ['sender.feather',
      'receiver.feather'], 'quic_owd.png'),
     ('SCReAM Queue Delay', plotters.plot_scream_queue_delay,
      ['sender.stderr.feather'], 'scream_queue_delay.png'),
@@ -48,6 +48,8 @@ plots = [
      'sender.stderr.feather'], 'gcc_estimates.png'),
     ('GCC Usage and State', plotters.plot_gcc_usage_and_state,
      ['sender.stderr.feather'], 'gcc_usage_state.png'),
+    ('SCTP Stats', plotters.plot_sctp_stats,
+     ['sender.stderr.sctp.feather'], 'sctp_stats.png'),
 
     ('Encoding frame sizes', plotters.plot_encoding_frame_size, [
      'sender.stderr.feather'], 'encoding_frame_sizes.png'),
@@ -74,15 +76,22 @@ async def parse_file(input, out_dir):
         df = parsers.parse_qlog(input)
         serializers.write_feather(
             df, Path(out_dir) / Path(input).with_suffix('.feather').name)
-    if path.suffix == '.pcap':
-        rtp, rtcp = await parsers.parse_pcap(input)
-        if rtp.empty or rtcp.empty:
-            return
-
+    if path.name in ['sender.stderr.log']:
+        df = parsers.parse_pion_sctp_log(input)
         serializers.write_feather(
-            rtp, Path(out_dir) / Path(Path(input).stem + '.rtp.feather'))
-        serializers.write_feather(rtcp, Path(
-            out_dir) / Path(Path(input).stem + '.rtcp.feather'))
+            df, Path(out_dir) / Path(input).with_suffix('.sctp.feather').name)
+    if path.suffix == '.pcap':
+        rtp, rtcp, dtls = await parsers.parse_pcap(input)
+
+        if not rtp.empty:
+            serializers.write_feather(
+                rtp, Path(out_dir) / Path(Path(input).stem + '.rtp.feather'))
+        if not rtcp.empty:
+            serializers.write_feather(
+                rtcp, Path(out_dir) / Path(Path(input).stem + '.rtcp.feather'))
+        if not dtls.empty:
+            serializers.write_feather(
+                dtls, Path(out_dir) / Path(Path(input).stem + '.dtls.feather'))
 
 
 async def parse_all_cmd(args):
