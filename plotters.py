@@ -28,6 +28,31 @@ def parse_rate(rate_str):
     return float(value) * unit_multipliers[unit]
 
 
+def _name_space_to_ip(namespace):
+    # TODO: only works for these two namespaces
+    match namespace:
+        case "ns1":
+            return '10.1.0.10'
+        case "ns4":
+            return '10.3.0.20'
+    raise ValueError(
+        f'dlts plotting only works for the namespaces ns1 and ns4, and not for {namespace}')
+
+
+def _get_ips_from_config(config_df):
+    sender_ip = '0.0.0.0'
+    receiver_ip = '0.0.0.0'
+
+    for _, row in config_df['applications'].items():
+        for app in row:
+            if app['name'] == "sender":
+                sender_ip = _name_space_to_ip(app['namespace'])
+            if app['name'] == "receiver":
+                receiver_ip = _name_space_to_ip(app['namespace'])
+
+    return sender_ip, receiver_ip
+
+
 def set_start_time_index(df, start_time, time_column):
     df['timestamp'] = pd.to_datetime(df[time_column])
     df.set_index('timestamp', inplace=True)
@@ -36,14 +61,15 @@ def set_start_time_index(df, start_time, time_column):
     return df
 
 
-def plot_rtp_rates(ax, start_time, cap_df, tx_df, rx_df):
+def plot_rtp_rates_log(ax, start_time, cap_df, tx_df, rx_df):
     """ plots rtp rates from logs"""
     plot_capacity(ax, start_time, cap_df)
     plot_target_rate(ax, start_time, tx_df)
     plot_rtp_rate(ax, start_time, tx_df, 'tx')
     plot_rtp_rate(ax, start_time, rx_df, 'rx')
-    rate_plot_ax_config(ax)
+    _rate_plot_ax_config(ax)
     return True
+
 
 def plot_rtp_rates_pcaps(ax, start_time, cap_df, tx_log_df, rtp_tx_df, rtp_rx_df, config_df):
     """plots rtp rates from pcaps"""
@@ -59,8 +85,8 @@ def plot_rtp_rates_pcaps(ax, start_time, cap_df, tx_log_df, rtp_tx_df, rtp_rx_df
     rtp_rx_df = rtp_rx_df[rtp_rx_df['dst'] == receiver_ip].copy()
     rtp_rx_df['rate'] = rtp_rx_df['length'] * 80
     _plot_rate(ax, start_time, rtp_rx_df, 'rx')
-    
-    rate_plot_ax_config(ax)
+
+    _rate_plot_ax_config(ax)
     return True
 
 
@@ -84,7 +110,7 @@ def plot_all_send_rates(ax, start_time, cap_df, tx_df):
     ax.plot(combined_df.index,
             combined_df['rate'], label='total', linewidth=0.5)
 
-    rate_plot_ax_config(ax)
+    _rate_plot_ax_config(ax)
     return True
 
 
@@ -109,11 +135,11 @@ def plot_all_recv_rates(ax, start_time, cap_df, tx_df, rx_df):
     ax.plot(combined_df.index,
             combined_df['rate'], label='total', linewidth=0.5)
 
-    rate_plot_ax_config(ax)
+    _rate_plot_ax_config(ax)
     return True
 
 
-def rate_plot_ax_config(ax):
+def _rate_plot_ax_config(ax):
     # ax.set_ylim(bottom=0, top=6e6)
     ax.set_xlabel('Time')
     ax.set_ylabel('Rate')
@@ -229,31 +255,6 @@ def plot_rtp_owd_pcap(ax, start_time, rtp_tx_df, rtp_rx_df):
     return _plot_owd(ax, start_time, rtp_tx_latency_df, rtp_rx_latency_df, 'extseq')
 
 
-def _name_space_to_ip(namespace):
-    # TODO: only works for these two namespaces
-    match namespace:
-        case "ns1":
-            return '10.1.0.10'
-        case "ns4":
-            return '10.3.0.20'
-    raise ValueError(
-        f'dlts plotting only works for the namespaces ns1 and ns4, and not for {namespace}')
-
-
-def _get_ips_from_config(config_df):
-    sender_ip = '0.0.0.0'
-    receiver_ip = '0.0.0.0'
-
-    for _, row in config_df['applications'].items():
-        for app in row:
-            if app['name'] == "sender":
-                sender_ip = _name_space_to_ip(app['namespace'])
-            if app['name'] == "receiver":
-                receiver_ip = _name_space_to_ip(app['namespace'])
-
-    return sender_ip, receiver_ip
-
-
 def plot_dlts_owd(ax, start_time, dlts_tx_df, dlts_rx_df, config_df):
     sender_ip, receiver_ip = _get_ips_from_config(config_df)
 
@@ -278,22 +279,17 @@ def plot_dlts_rates(ax, start_time, cap_df, tx_df, dlts_tx_df, dlts_rx_df, confi
     plot_capacity(ax, start_time, cap_df)
     plot_target_rate(ax, start_time, tx_df)
 
-    if dlts_tx_df.empty and dlts_rx_df.empty:
-        return False
-
     sender_ip, receiver_ip = _get_ips_from_config(config_df)
 
-    if not dlts_tx_df.empty:
-        dlts_tx_df = dlts_tx_df[dlts_tx_df['src'] == sender_ip].copy()
-        dlts_tx_df['rate'] = dlts_tx_df['length'] * 80
-        _plot_rate(ax, start_time, dlts_tx_df, 'tx')
+    dlts_tx_df = dlts_tx_df[dlts_tx_df['src'] == sender_ip].copy()
+    dlts_tx_df['rate'] = dlts_tx_df['length'] * 80
+    _plot_rate(ax, start_time, dlts_tx_df, 'tx')
 
-    if not dlts_rx_df.empty:
-        dlts_rx_df = dlts_rx_df[dlts_rx_df['dst'] == receiver_ip].copy()
-        dlts_rx_df['rate'] = dlts_rx_df['length'] * 80
-        _plot_rate(ax, start_time, dlts_rx_df, 'rx')
+    dlts_rx_df = dlts_rx_df[dlts_rx_df['dst'] == receiver_ip].copy()
+    dlts_rx_df['rate'] = dlts_rx_df['length'] * 80
+    _plot_rate(ax, start_time, dlts_rx_df, 'rx')
 
-    rate_plot_ax_config(ax)
+    _rate_plot_ax_config(ax)
     return True
 
 

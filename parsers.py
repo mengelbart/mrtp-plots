@@ -1,7 +1,5 @@
 import json
 import re
-from datetime import datetime
-from math import log
 
 import pandas as pd
 import pyshark
