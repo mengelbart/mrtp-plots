@@ -37,10 +37,29 @@ def set_start_time_index(df, start_time, time_column):
 
 
 def plot_rtp_rates(ax, start_time, cap_df, tx_df, rx_df):
+    """ plots rtp rates from logs"""
     plot_capacity(ax, start_time, cap_df)
+    plot_target_rate(ax, start_time, tx_df)
     plot_rtp_rate(ax, start_time, tx_df, 'tx')
     plot_rtp_rate(ax, start_time, rx_df, 'rx')
-    plot_target_rate(ax, start_time, tx_df)
+    rate_plot_ax_config(ax)
+    return True
+
+def plot_rtp_rates_pcaps(ax, start_time, cap_df, tx_log_df, rtp_tx_df, rtp_rx_df, config_df):
+    """plots rtp rates from pcaps"""
+    plot_capacity(ax, start_time, cap_df)
+    plot_target_rate(ax, start_time, tx_log_df)
+
+    sender_ip, receiver_ip = _get_ips_from_config(config_df)
+
+    rtp_tx_df = rtp_tx_df[rtp_tx_df['src'] == sender_ip].copy()
+    rtp_tx_df['rate'] = rtp_tx_df['length'] * 80
+    _plot_rate(ax, start_time, rtp_tx_df, 'tx')
+
+    rtp_rx_df = rtp_rx_df[rtp_rx_df['dst'] == receiver_ip].copy()
+    rtp_rx_df['rate'] = rtp_rx_df['length'] * 80
+    _plot_rate(ax, start_time, rtp_rx_df, 'rx')
+    
     rate_plot_ax_config(ax)
     return True
 
