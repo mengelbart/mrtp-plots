@@ -16,7 +16,7 @@ import serializers
 import plot_version_comparison
 
 plots = [
-    ('RTP Rates (logging)', plotters.plot_rtp_rates, [
+    ('RTP Rates (logging)', plotters.plot_rtp_rates_log, [
      'tc.feather', 'sender.stderr.feather', 'receiver.stderr.feather'], 'rtp_rates_logs.png'),
     ('RTP Rates (pcaps)', plotters.plot_rtp_rates_pcaps, [
      'tc.feather', 'sender.stderr.feather', 'ns4.rtp.feather', 'ns1.rtp.feather', 'config.feather'], 'rtp_rates.png'),
