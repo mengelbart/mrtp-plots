@@ -16,11 +16,13 @@ import serializers
 import plot_version_comparison
 
 plots = [
-    ('RTP Rates', plotters.plot_rtp_rates, [
-     'tc.feather', 'sender.stderr.feather', 'receiver.stderr.feather'], 'rtp_rates.png'),
-    ('Send Rates', plotters.plot_all_send_rates, [
+    ('RTP Rates (logging)', plotters.plot_rtp_rates, [
+     'tc.feather', 'sender.stderr.feather', 'receiver.stderr.feather'], 'rtp_rates_logs.png'),
+    ('RTP Rates (pcaps)', plotters.plot_rtp_rates_pcaps, [
+     'tc.feather', 'sender.stderr.feather', 'ns4.rtp.feather', 'ns1.rtp.feather', 'config.feather'], 'rtp_rates.png'),
+    ('Send Rates (logging)', plotters.plot_all_send_rates, [
      'tc.feather', 'sender.stderr.feather'], 'all_send_rates.png'),
-    ('Receive Rates', plotters.plot_all_recv_rates, [
+    ('Receive Rates (logging)', plotters.plot_all_recv_rates, [
      'tc.feather', 'sender.stderr.feather', 'receiver.stderr.feather'], 'all_recv_rates.png'),
     # ('RTP Send Rate', plotters.plot_rtp_rate, [
     #  'sender.stderr.feather'], 'rtp_send_rate.png'),
@@ -34,7 +36,7 @@ plots = [
      'ns1.rtp.feather'], 'rtp_owd.png'),
     ('RTP OWD (logging)', plotters.plot_rtp_owd_log, ['sender.stderr.feather',
      'receiver.stderr.feather'], 'rtp_owd_log.png'),
-    ('QUIC OWD', plotters.plot_qloq_owd, ['sender.feather',
+    ('QUIC OWD (logging)', plotters.plot_qloq_owd, ['sender.feather',
      'receiver.feather'], 'quic_owd.png'),
     ('SCReAM Queue Delay', plotters.plot_scream_queue_delay,
      ['sender.stderr.feather'], 'scream_queue_delay.png'),
