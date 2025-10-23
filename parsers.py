@@ -5,6 +5,11 @@ import pandas as pd
 import pyshark
 
 
+def parse_csv(csv_file):
+    df = pd.read_csv(csv_file)
+    return df
+
+
 def parse_json_log(log_file):
     with open(log_file, 'r') as f:
         data = _read_json_lines(f)

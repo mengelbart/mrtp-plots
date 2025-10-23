@@ -14,6 +14,7 @@ import plotters
 import html_generator
 import serializers
 import plot_version_comparison
+import video_quality
 
 plots = [
     ('RTP Rates (logging)', plotters.plot_rtp_rates_log, [
@@ -72,6 +73,8 @@ plots = [
 
     ('E2E Latency', plotters.plot_e2e_latency, [
      'sender.stderr.feather', 'receiver.stderr.feather'], 'e2e_latency.png'),
+    ('Video Quality Metrics', plotters.plot_video_quality, [
+     'video.quality.feather'], 'video_quality.png'),
 ]
 
 
@@ -101,6 +104,10 @@ async def parse_file(input, out_dir):
         if not dtls.empty:
             serializers.write_feather(
                 dtls, Path(out_dir) / Path(Path(input).stem + '.dtls.feather'))
+    if path.name in ['video.quality.csv']:
+        df = pd.read_csv(input)
+        serializers.write_feather(
+            df, Path(out_dir) / Path(Path(input).stem + '.feather'))
 
 
 async def parse_all_cmd(args):
@@ -148,6 +155,11 @@ async def plot_combis_cmd(args):
     plot_version_comparison.plot_version_comparison(args.input, args.output)
 
 
+async def calc_video_metrics(args):
+    video_quality.calculate_quality_metrics(
+        args.reference, args.distorted, args.output)
+
+
 def main():
     parser = argparse.ArgumentParser(
         formatter_class=argparse.ArgumentDefaultsHelpFormatter)
@@ -190,6 +202,16 @@ def main():
     plot_combis.add_argument(
         '-o', '--output', help='output directory for plots', required=True)
     plot_combis.set_defaults(func=plot_combis_cmd)
+
+    video_qm = subparsers.add_parser(
+        'video-quality', help='caluculate video quality metrics using ffmpeg')
+    video_qm.add_argument(
+        '-r', '--reference', help='reference video', required=True)
+    video_qm.add_argument(
+        '-d', '--distorted', help='distorted video', required=True)
+    video_qm.add_argument(
+        '-o', '--output', help='output directory for result csv', required=True)
+    video_qm.set_defaults(func=calc_video_metrics)
 
     args = parser.parse_args()
     asyncio.run(args.func(args))
