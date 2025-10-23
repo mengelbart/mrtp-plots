@@ -116,8 +116,6 @@ async def parse_pcap(pcap_file):
         rtp_df = pd.DataFrame(rtp_data)
         rtp_df['time'] = pd.to_datetime(rtp_df['time'], format='ISO8601')
         rtp_df = rtp_df.set_index('time')
-    else:
-        print(f'>>> no RTP packets found in {pcap_file}')
 
     if len(rtcp_data) > 0:
         rtcp_df = pd.DataFrame(rtcp_data)
