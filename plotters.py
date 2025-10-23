@@ -490,7 +490,6 @@ def plot_sctp_stats(ax, start_time, df):
     ax.set_ylabel('Size')
     ax.xaxis.set_major_formatter(
         mticker.FuncFormatter(lambda x, pos: f'{x:.0f}s'))
-    # ax.yaxis.set_major_formatter(mticker.EngFormatter(unit='B'))
     ax.legend(loc='upper right')
     return True
 
@@ -564,4 +563,27 @@ def plot_e2e_latency(ax, start_time, encoding_df, decoding_df):
     ax.bar(df.index, df['latency'], label='E2E Latency')
     ax.yaxis.set_major_formatter(mticker.EngFormatter(unit='s'))
     ax.legend(loc='upper right')
+    return True
+
+
+def plot_video_quality(ax, start_time, qm_df):
+    ax_psnr = ax
+    ax_ssim = ax_psnr.twinx()
+
+    ax_psnr.plot(qm_df["n"], qm_df["psnr_avg"],
+                 linestyle="-", marker="", label="psnr avg", color="tab:blue")
+    ax_ssim.plot(qm_df["n"], qm_df["ssim_avg"],
+                 linestyle="-", marker="", label="ssim avg", color="tab:orange")
+
+    ax_psnr.set_ylabel("PSNR (dB)", color="tab:blue")
+    ax_ssim.set_ylabel("SSIM", color="tab:orange")
+
+    ax_psnr.tick_params(axis='y', labelcolor="tab:blue")
+    ax_ssim.tick_params(axis='y', labelcolor="tab:orange")
+
+    ax_psnr.legend(loc='upper left')
+    ax_ssim.legend(loc='upper right')
+
+    ax_psnr.set_xlim(right=3000, left=0)
+
     return True
