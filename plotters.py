@@ -141,15 +141,20 @@ def plot_data_rate(ax, start_time, df, label, event_name='DataSource sent data')
     return _plot_data_rate(ax, start_time, df, label)
 
 
-def _plot_data_rate(ax, start_time, df, label):
-    df['timestamp'] = pd.to_datetime(df['time'])
-    df.set_index('timestamp', inplace=True)
+def _plot_rate(ax, start_time, df, label):
+    """time as index and rate as column"""
     df = df.resample('100ms').sum().copy()
     df['second'] = (df.index - start_time).total_seconds()
     df.set_index('second', inplace=True)
     ax.plot(df.index, df['rate'], label=label, linewidth=0.5)
 
     return True, df
+
+
+def _plot_data_rate(ax, start_time, df, label):
+    df['timestamp'] = pd.to_datetime(df['time'])
+    df.set_index('timestamp', inplace=True)
+    return _plot_rate(ax, start_time, df, label)
 
 
 def plot_rtp_loss_pcap(ax, start_time, rtp_tx_df, rtp_rx_df):
@@ -205,6 +210,74 @@ def plot_rtp_owd_pcap(ax, start_time, rtp_tx_df, rtp_rx_df):
     return _plot_owd(ax, start_time, rtp_tx_latency_df, rtp_rx_latency_df, 'extseq')
 
 
+def _name_space_to_ip(namespace):
+    # TODO: only works for these two namespaces
+    match namespace:
+        case "ns1":
+            return '10.1.0.10'
+        case "ns4":
+            return '10.3.0.20'
+    raise ValueError(
+        f'dlts plotting only works for the namespaces ns1 and ns4, and not for {namespace}')
+
+
+def _get_ips_from_config(config_df):
+    sender_ip = '0.0.0.0'
+    receiver_ip = '0.0.0.0'
+
+    for _, row in config_df['applications'].items():
+        for app in row:
+            if app['name'] == "sender":
+                sender_ip = _name_space_to_ip(app['namespace'])
+            if app['name'] == "receiver":
+                receiver_ip = _name_space_to_ip(app['namespace'])
+
+    return sender_ip, receiver_ip
+
+
+def plot_dlts_owd(ax, start_time, dlts_tx_df, dlts_rx_df, config_df):
+    sender_ip, receiver_ip = _get_ips_from_config(config_df)
+
+    dlts_tx_latency_df = dlts_tx_df[dlts_tx_df['src'] == sender_ip].copy()
+    dlts_rx_latency_df = dlts_rx_df[dlts_rx_df['dst'] == receiver_ip].copy()
+    dlts_tx_latency_df['ts'] = dlts_tx_latency_df.index
+    dlts_rx_latency_df['ts'] = dlts_rx_latency_df.index
+
+    return _plot_owd(ax, start_time, dlts_tx_latency_df, dlts_rx_latency_df, 'seq')
+
+
+def plot_dlts_loss(ax, start_time, dlts_tx_df, dlts_rx_df, config_df):
+    sender_ip, receiver_ip = _get_ips_from_config(config_df)
+
+    dlts_tx_latency_df = dlts_tx_df[dlts_tx_df['src'] == sender_ip].copy()
+    dlts_rx_latency_df = dlts_rx_df[dlts_rx_df['dst'] == receiver_ip].copy()
+
+    return _plot_rtp_loss(ax, start_time, dlts_tx_latency_df, dlts_rx_latency_df, 'seq')
+
+
+def plot_dlts_rates(ax, start_time, cap_df, tx_df, dlts_tx_df, dlts_rx_df, config_df):
+    plot_capacity(ax, start_time, cap_df)
+    plot_target_rate(ax, start_time, tx_df)
+
+    if dlts_tx_df.empty and dlts_rx_df.empty:
+        return False
+
+    sender_ip, receiver_ip = _get_ips_from_config(config_df)
+
+    if not dlts_tx_df.empty:
+        dlts_tx_df = dlts_tx_df[dlts_tx_df['src'] == sender_ip].copy()
+        dlts_tx_df['rate'] = dlts_tx_df['length'] * 80
+        _plot_rate(ax, start_time, dlts_tx_df, 'tx')
+
+    if not dlts_rx_df.empty:
+        dlts_rx_df = dlts_rx_df[dlts_rx_df['dst'] == receiver_ip].copy()
+        dlts_rx_df['rate'] = dlts_rx_df['length'] * 80
+        _plot_rate(ax, start_time, dlts_rx_df, 'rx')
+
+    rate_plot_ax_config(ax)
+    return True
+
+
 def plot_qloq_owd(ax, start_time, qlog_tx_df, qlog_rx_df):
     quic_tx_latency_df = qlog_tx_df[qlog_tx_df['name']
                                     == 'transport:packet_sent'].copy()
@@ -216,6 +289,7 @@ def plot_qloq_owd(ax, start_time, qlog_tx_df, qlog_rx_df):
     if quic_tx_latency_df.empty or quic_rx_latency_df.empty:
         return False
 
+    # TODO: should be done in parsing step
     quic_tx_latency_df['time'] = quic_tx_latency_df['time'].dt.tz_localize(
         'UTC').dt.tz_convert(tzinfo)
     quic_rx_latency_df['time'] = quic_rx_latency_df['time'].dt.tz_localize(
@@ -384,9 +458,10 @@ def plot_sctp_stats(ax, start_time, df):
     if df.empty:
         return False
 
-    # Ensure 'time' is pandas Timestamp, then add start_time (also a pd.Timestamp)
+    # TODO: should be done in parsing step
+    tzinfo = getattr(start_time, 'tzinfo', None)
     df['time'] = pd.to_datetime(df['pion-time'])
-    df['time'] = df['time'].dt.tz_localize('UTC')
+    df['time'] = df['time'].dt.tz_localize(tzinfo)
 
     # Add only the day of start_time to each timestamp
     day_offset = pd.Timestamp(start_time.date())

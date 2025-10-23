@@ -50,6 +50,13 @@ plots = [
      ['sender.stderr.feather'], 'gcc_usage_state.png'),
     ('SCTP Stats', plotters.plot_sctp_stats,
      ['sender.stderr.sctp.feather'], 'sctp_stats.png'),
+    ('DLTS OWD (pcap)', plotters.plot_dlts_owd, ['ns4.dtls.feather',
+     'ns1.dtls.feather', 'config.feather'], 'dtls_owd.png'),
+    ('DLTS loss (pcap)', plotters.plot_dlts_loss, ['ns4.dtls.feather',
+     'ns1.dtls.feather', 'config.feather'], 'dtls_loss.png'),
+    ('DLTS rate (pcap)', plotters.plot_dlts_rates, [
+        'tc.feather', 'sender.stderr.feather', 'ns4.dtls.feather', 'ns1.dtls.feather',
+        'config.feather'], 'dtls_rate.png'),
 
     ('Encoding frame sizes', plotters.plot_encoding_frame_size, [
      'sender.stderr.feather'], 'encoding_frame_sizes.png'),
