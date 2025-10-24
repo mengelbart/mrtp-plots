@@ -134,6 +134,7 @@ async def plot_cmd(args):
             plotted = func(ax, start_time, *dfs)
             if not plotted:
                 print(f'dropping empty plot {func.__name__}')
+                plt.close(fig)
                 continue
         else:
             missing = [str(p) for p in paths if not p.is_file()]
