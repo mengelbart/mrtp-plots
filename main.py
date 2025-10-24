@@ -14,13 +14,16 @@ import plotters
 import html_generator
 import serializers
 import plot_version_comparison
+import video_quality
 
 plots = [
-    ('RTP Rates', plotters.plot_rtp_rates, [
-     'tc.feather', 'sender.stderr.feather', 'receiver.stderr.feather'], 'rtp_rates.png'),
-    ('Send Rates', plotters.plot_all_send_rates, [
+    ('RTP Rates (logging)', plotters.plot_rtp_rates_log, [
+     'tc.feather', 'sender.stderr.feather', 'receiver.stderr.feather'], 'rtp_rates_logs.png'),
+    ('RTP Rates (pcaps)', plotters.plot_rtp_rates_pcaps, [
+     'tc.feather', 'sender.stderr.feather', 'ns4.rtp.feather', 'ns1.rtp.feather', 'config.feather'], 'rtp_rates.png'),
+    ('Send Rates (logging)', plotters.plot_all_send_rates, [
      'tc.feather', 'sender.stderr.feather'], 'all_send_rates.png'),
-     ('Receive Rates', plotters.plot_all_recv_rates, [
+    ('Receive Rates (logging)', plotters.plot_all_recv_rates, [
      'tc.feather', 'sender.stderr.feather', 'receiver.stderr.feather'], 'all_recv_rates.png'),
     # ('RTP Send Rate', plotters.plot_rtp_rate, [
     #  'sender.stderr.feather'], 'rtp_send_rate.png'),
@@ -34,7 +37,7 @@ plots = [
      'ns1.rtp.feather'], 'rtp_owd.png'),
     ('RTP OWD (logging)', plotters.plot_rtp_owd_log, ['sender.stderr.feather',
      'receiver.stderr.feather'], 'rtp_owd_log.png'),
-    ('QUIC OWD', plotters.plot_qloq_owd, ['sender.feather', 
+    ('QUIC OWD (logging)', plotters.plot_qloq_owd, ['sender.feather',
      'receiver.feather'], 'quic_owd.png'),
     ('SCReAM Queue Delay', plotters.plot_scream_queue_delay,
      ['sender.stderr.feather'], 'scream_queue_delay.png'),
@@ -48,6 +51,15 @@ plots = [
      'sender.stderr.feather'], 'gcc_estimates.png'),
     ('GCC Usage and State', plotters.plot_gcc_usage_and_state,
      ['sender.stderr.feather'], 'gcc_usage_state.png'),
+    ('SCTP Stats', plotters.plot_sctp_stats,
+     ['sender.stderr.sctp.feather'], 'sctp_stats.png'),
+    ('DLTS OWD (pcap)', plotters.plot_dlts_owd, ['ns4.dtls.feather',
+     'ns1.dtls.feather', 'config.feather'], 'dtls_owd.png'),
+    ('DLTS loss (pcap)', plotters.plot_dlts_loss, ['ns4.dtls.feather',
+     'ns1.dtls.feather', 'config.feather'], 'dtls_loss.png'),
+    ('DLTS rate (pcap)', plotters.plot_dlts_rates, [
+        'tc.feather', 'sender.stderr.feather', 'ns4.dtls.feather', 'ns1.dtls.feather',
+        'config.feather'], 'dtls_rate.png'),
 
     ('Encoding frame sizes', plotters.plot_encoding_frame_size, [
      'sender.stderr.feather'], 'encoding_frame_sizes.png'),
@@ -61,6 +73,8 @@ plots = [
 
     ('E2E Latency', plotters.plot_e2e_latency, [
      'sender.stderr.feather', 'receiver.stderr.feather'], 'e2e_latency.png'),
+    ('Video Quality Metrics', plotters.plot_video_quality, [
+     'video.quality.feather'], 'video_quality.png'),
 ]
 
 
@@ -74,15 +88,26 @@ async def parse_file(input, out_dir):
         df = parsers.parse_qlog(input)
         serializers.write_feather(
             df, Path(out_dir) / Path(input).with_suffix('.feather').name)
-    if path.suffix == '.pcap':
-        rtp, rtcp = await parsers.parse_pcap(input)
-        if rtp.empty or rtcp.empty:
-            return
-
+    if path.name in ['sender.stderr.log']:
+        df = parsers.parse_pion_sctp_log(input)
         serializers.write_feather(
-            rtp, Path(out_dir) / Path(Path(input).stem + '.rtp.feather'))
-        serializers.write_feather(rtcp, Path(
-            out_dir) / Path(Path(input).stem + '.rtcp.feather'))
+            df, Path(out_dir) / Path(input).with_suffix('.sctp.feather').name)
+    if path.suffix == '.pcap':
+        rtp, rtcp, dtls = await parsers.parse_pcap(input)
+
+        if not rtp.empty:
+            serializers.write_feather(
+                rtp, Path(out_dir) / Path(Path(input).stem + '.rtp.feather'))
+        if not rtcp.empty:
+            serializers.write_feather(
+                rtcp, Path(out_dir) / Path(Path(input).stem + '.rtcp.feather'))
+        if not dtls.empty:
+            serializers.write_feather(
+                dtls, Path(out_dir) / Path(Path(input).stem + '.dtls.feather'))
+    if path.name in ['video.quality.csv']:
+        df = pd.read_csv(input)
+        serializers.write_feather(
+            df, Path(out_dir) / Path(Path(input).stem + '.feather'))
 
 
 async def parse_all_cmd(args):
@@ -109,6 +134,7 @@ async def plot_cmd(args):
             plotted = func(ax, start_time, *dfs)
             if not plotted:
                 print(f'dropping empty plot {func.__name__}')
+                plt.close(fig)
                 continue
         else:
             missing = [str(p) for p in paths if not p.is_file()]
@@ -128,6 +154,11 @@ async def generate_cmd(args):
 
 async def plot_combis_cmd(args):
     plot_version_comparison.plot_version_comparison(args.input, args.output)
+
+
+async def calc_video_metrics(args):
+    video_quality.calculate_quality_metrics(
+        args.reference, args.distorted, args.output)
 
 
 def main():
@@ -172,6 +203,16 @@ def main():
     plot_combis.add_argument(
         '-o', '--output', help='output directory for plots', required=True)
     plot_combis.set_defaults(func=plot_combis_cmd)
+
+    video_qm = subparsers.add_parser(
+        'video-quality', help='caluculate video quality metrics using ffmpeg')
+    video_qm.add_argument(
+        '-r', '--reference', help='reference video', required=True)
+    video_qm.add_argument(
+        '-d', '--distorted', help='distorted video', required=True)
+    video_qm.add_argument(
+        '-o', '--output', help='output directory for result csv', required=True)
+    video_qm.set_defaults(func=calc_video_metrics)
 
     args = parser.parse_args()
     asyncio.run(args.func(args))

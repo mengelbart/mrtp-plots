@@ -1,7 +1,7 @@
 import datetime
+import re
 import matplotlib.ticker as mticker
 import pandas as pd
-import re
 
 unit_multipliers = {
     'bit': 1,
@@ -28,6 +28,31 @@ def parse_rate(rate_str):
     return float(value) * unit_multipliers[unit]
 
 
+def _name_space_to_ip(namespace):
+    # TODO: only works for these two namespaces
+    match namespace:
+        case "ns1":
+            return '10.1.0.10'
+        case "ns4":
+            return '10.3.0.20'
+    raise ValueError(
+        f'dlts plotting only works for the namespaces ns1 and ns4, and not for {namespace}')
+
+
+def _get_ips_from_config(config_df):
+    sender_ip = '0.0.0.0'
+    receiver_ip = '0.0.0.0'
+
+    for _, row in config_df['applications'].items():
+        for app in row:
+            if app['name'] == "sender":
+                sender_ip = _name_space_to_ip(app['namespace'])
+            if app['name'] == "receiver":
+                receiver_ip = _name_space_to_ip(app['namespace'])
+
+    return sender_ip, receiver_ip
+
+
 def set_start_time_index(df, start_time, time_column):
     df['timestamp'] = pd.to_datetime(df[time_column])
     df.set_index('timestamp', inplace=True)
@@ -36,23 +61,43 @@ def set_start_time_index(df, start_time, time_column):
     return df
 
 
-def plot_rtp_rates(ax, start_time, cap_df, tx_df, rx_df):
+def plot_rtp_rates_log(ax, start_time, cap_df, tx_df, rx_df):
+    """ plots rtp rates from logs"""
     plot_capacity(ax, start_time, cap_df)
+    plot_target_rate(ax, start_time, tx_df)
     plot_rtp_rate(ax, start_time, tx_df, 'tx')
     plot_rtp_rate(ax, start_time, rx_df, 'rx')
-    plot_target_rate(ax, start_time, tx_df)
-    rate_plot_ax_config(ax)
+    _rate_plot_ax_config(ax)
+    return True
+
+
+def plot_rtp_rates_pcaps(ax, start_time, cap_df, tx_log_df, rtp_tx_df, rtp_rx_df, config_df):
+    """plots rtp rates from pcaps"""
+    plot_capacity(ax, start_time, cap_df)
+    plot_target_rate(ax, start_time, tx_log_df)
+
+    sender_ip, receiver_ip = _get_ips_from_config(config_df)
+
+    rtp_tx_df = rtp_tx_df[rtp_tx_df['src'] == sender_ip].copy()
+    rtp_tx_df['rate'] = rtp_tx_df['length'] * 80
+    _plot_rate(ax, start_time, rtp_tx_df, 'tx')
+
+    rtp_rx_df = rtp_rx_df[rtp_rx_df['dst'] == receiver_ip].copy()
+    rtp_rx_df['rate'] = rtp_rx_df['length'] * 80
+    _plot_rate(ax, start_time, rtp_rx_df, 'rx')
+
+    _rate_plot_ax_config(ax)
     return True
 
 
 def plot_all_send_rates(ax, start_time, cap_df, tx_df):
     plot_capacity(ax, start_time, cap_df)
-    tr_plotted = plot_target_rate(
+    plot_target_rate(
         ax, start_time, tx_df, event_name='NEW_TARGET_RATE')
     tx_data_plotted, data_df = plot_data_rate(ax, start_time, tx_df, 'data')
 
     # only plot if data was sent
-    if not tx_data_plotted or not tr_plotted:
+    if not tx_data_plotted:
         return False
 
     _, media_df = plot_rtp_rate(ax, start_time, tx_df, 'media')
@@ -65,19 +110,19 @@ def plot_all_send_rates(ax, start_time, cap_df, tx_df):
     ax.plot(combined_df.index,
             combined_df['rate'], label='total', linewidth=0.5)
 
-    rate_plot_ax_config(ax)
+    _rate_plot_ax_config(ax)
     return True
 
 
 def plot_all_recv_rates(ax, start_time, cap_df, tx_df, rx_df):
     plot_capacity(ax, start_time, cap_df)
-    tr_plotted = plot_target_rate(
+    plot_target_rate(
         ax, start_time, tx_df, event_name='NEW_TARGET_RATE')
     rx_plotted, data_df = plot_data_rate(
         ax, start_time, rx_df, 'data', event_name='DataSink received data')
 
     # only plot if data was sent
-    if not rx_plotted or not tr_plotted:
+    if not rx_plotted:
         return False
 
     _, media_df = plot_rtp_rate(ax, start_time, rx_df, 'media')
@@ -90,11 +135,11 @@ def plot_all_recv_rates(ax, start_time, cap_df, tx_df, rx_df):
     ax.plot(combined_df.index,
             combined_df['rate'], label='total', linewidth=0.5)
 
-    rate_plot_ax_config(ax)
+    _rate_plot_ax_config(ax)
     return True
 
 
-def rate_plot_ax_config(ax):
+def _rate_plot_ax_config(ax):
     # ax.set_ylim(bottom=0, top=6e6)
     ax.set_xlabel('Time')
     ax.set_ylabel('Rate')
@@ -141,15 +186,20 @@ def plot_data_rate(ax, start_time, df, label, event_name='DataSource sent data')
     return _plot_data_rate(ax, start_time, df, label)
 
 
-def _plot_data_rate(ax, start_time, df, label):
-    df['timestamp'] = pd.to_datetime(df['time'])
-    df.set_index('timestamp', inplace=True)
+def _plot_rate(ax, start_time, df, label):
+    """time as index and rate as column"""
     df = df.resample('100ms').sum().copy()
     df['second'] = (df.index - start_time).total_seconds()
     df.set_index('second', inplace=True)
     ax.plot(df.index, df['rate'], label=label, linewidth=0.5)
 
     return True, df
+
+
+def _plot_data_rate(ax, start_time, df, label):
+    df['timestamp'] = pd.to_datetime(df['time'])
+    df.set_index('timestamp', inplace=True)
+    return _plot_rate(ax, start_time, df, label)
 
 
 def plot_rtp_loss_pcap(ax, start_time, rtp_tx_df, rtp_rx_df):
@@ -205,6 +255,44 @@ def plot_rtp_owd_pcap(ax, start_time, rtp_tx_df, rtp_rx_df):
     return _plot_owd(ax, start_time, rtp_tx_latency_df, rtp_rx_latency_df, 'extseq')
 
 
+def plot_dlts_owd(ax, start_time, dlts_tx_df, dlts_rx_df, config_df):
+    sender_ip, receiver_ip = _get_ips_from_config(config_df)
+
+    dlts_tx_latency_df = dlts_tx_df[dlts_tx_df['src'] == sender_ip].copy()
+    dlts_rx_latency_df = dlts_rx_df[dlts_rx_df['dst'] == receiver_ip].copy()
+    dlts_tx_latency_df['ts'] = dlts_tx_latency_df.index
+    dlts_rx_latency_df['ts'] = dlts_rx_latency_df.index
+
+    return _plot_owd(ax, start_time, dlts_tx_latency_df, dlts_rx_latency_df, 'seq')
+
+
+def plot_dlts_loss(ax, start_time, dlts_tx_df, dlts_rx_df, config_df):
+    sender_ip, receiver_ip = _get_ips_from_config(config_df)
+
+    dlts_tx_latency_df = dlts_tx_df[dlts_tx_df['src'] == sender_ip].copy()
+    dlts_rx_latency_df = dlts_rx_df[dlts_rx_df['dst'] == receiver_ip].copy()
+
+    return _plot_rtp_loss(ax, start_time, dlts_tx_latency_df, dlts_rx_latency_df, 'seq')
+
+
+def plot_dlts_rates(ax, start_time, cap_df, tx_df, dlts_tx_df, dlts_rx_df, config_df):
+    plot_capacity(ax, start_time, cap_df)
+    plot_target_rate(ax, start_time, tx_df)
+
+    sender_ip, receiver_ip = _get_ips_from_config(config_df)
+
+    dlts_tx_df = dlts_tx_df[dlts_tx_df['src'] == sender_ip].copy()
+    dlts_tx_df['rate'] = dlts_tx_df['length'] * 80
+    _plot_rate(ax, start_time, dlts_tx_df, 'tx')
+
+    dlts_rx_df = dlts_rx_df[dlts_rx_df['dst'] == receiver_ip].copy()
+    dlts_rx_df['rate'] = dlts_rx_df['length'] * 80
+    _plot_rate(ax, start_time, dlts_rx_df, 'rx')
+
+    _rate_plot_ax_config(ax)
+    return True
+
+
 def plot_qloq_owd(ax, start_time, qlog_tx_df, qlog_rx_df):
     quic_tx_latency_df = qlog_tx_df[qlog_tx_df['name']
                                     == 'transport:packet_sent'].copy()
@@ -216,6 +304,7 @@ def plot_qloq_owd(ax, start_time, qlog_tx_df, qlog_rx_df):
     if quic_tx_latency_df.empty or quic_rx_latency_df.empty:
         return False
 
+    # TODO: should be done in parsing step
     quic_tx_latency_df['time'] = quic_tx_latency_df['time'].dt.tz_localize(
         'UTC').dt.tz_convert(tzinfo)
     quic_rx_latency_df['time'] = quic_rx_latency_df['time'].dt.tz_localize(
@@ -376,6 +465,35 @@ def plot_gcc_usage_and_state(ax, start_time, df):
     return True
 
 
+def plot_sctp_stats(ax, start_time, df):
+    if df.empty:
+        return False
+
+    df = df[df['msg'] == 'pion-sctp-cwnd'].copy()
+    if df.empty:
+        return False
+
+    # TODO: should be done in parsing step
+    tzinfo = getattr(start_time, 'tzinfo', None)
+    df['time'] = pd.to_datetime(df['pion-time'])
+    df['time'] = df['time'].dt.tz_localize(tzinfo)
+
+    # Add only the day of start_time to each timestamp
+    day_offset = pd.Timestamp(start_time.date())
+    df['time'] = df['time'].apply(lambda t: t.replace(
+        year=day_offset.year, month=day_offset.month, day=day_offset.day))
+
+    df = set_start_time_index(df, start_time, 'time')
+    ax.step(df.index, df['cwnd'], where='post',
+            label='sctp cwnd', linewidth=0.5)
+    ax.set_xlabel('Time')
+    ax.set_ylabel('Size')
+    ax.xaxis.set_major_formatter(
+        mticker.FuncFormatter(lambda x, pos: f'{x:.0f}s'))
+    ax.legend(loc='upper right')
+    return True
+
+
 def plot_encoding_frame_size(ax, start_time, df):
     encoding = df[df['msg'] == 'encoding frame']
     encoded = df[df['msg'] == 'encoded frame']
@@ -445,4 +563,27 @@ def plot_e2e_latency(ax, start_time, encoding_df, decoding_df):
     ax.bar(df.index, df['latency'], label='E2E Latency')
     ax.yaxis.set_major_formatter(mticker.EngFormatter(unit='s'))
     ax.legend(loc='upper right')
+    return True
+
+
+def plot_video_quality(ax, start_time, qm_df):
+    ax_psnr = ax
+    ax_ssim = ax_psnr.twinx()
+
+    ax_psnr.plot(qm_df["n"], qm_df["psnr_avg"],
+                 linestyle="-", marker="", label="psnr avg", color="tab:blue")
+    ax_ssim.plot(qm_df["n"], qm_df["ssim_avg"],
+                 linestyle="-", marker="", label="ssim avg", color="tab:orange")
+
+    ax_psnr.set_ylabel("PSNR (dB)", color="tab:blue")
+    ax_ssim.set_ylabel("SSIM", color="tab:orange")
+
+    ax_psnr.tick_params(axis='y', labelcolor="tab:blue")
+    ax_ssim.tick_params(axis='y', labelcolor="tab:orange")
+
+    ax_psnr.legend(loc='upper left')
+    ax_ssim.legend(loc='upper right')
+
+    ax_psnr.set_xlim(right=3000, left=0)
+
     return True
