@@ -3,7 +3,6 @@
 import argparse
 import asyncio
 
-import datetime
 from pathlib import Path
 
 import matplotlib.pyplot as plt
@@ -17,28 +16,48 @@ import plot_version_comparison
 import video_quality
 
 plots = [
+    # RTP rates
     ('RTP Rates (logging)', plotters.plot_rtp_rates_log, [
      'tc.feather', 'sender.stderr.feather', 'receiver.stderr.feather'], 'rtp_rates_logs.png'),
     ('RTP Rates (pcaps)', plotters.plot_rtp_rates_pcaps, [
      'tc.feather', 'sender.stderr.feather', 'ns4.rtp.feather', 'ns1.rtp.feather', 'config.feather'], 'rtp_rates.png'),
-    ('Send Rates (logging)', plotters.plot_all_send_rates, [
-     'tc.feather', 'sender.stderr.feather'], 'all_send_rates.png'),
-    ('Receive Rates (logging)', plotters.plot_all_recv_rates, [
-     'tc.feather', 'sender.stderr.feather', 'receiver.stderr.feather'], 'all_recv_rates.png'),
+    ('QUIC Rates (qlog)', plotters.plot_quic_rates, [
+     'tc.feather', 'sender.stderr.feather', 'sender.feather', 'receiver.feather'], 'quic_rates.png'),
     # ('RTP Send Rate', plotters.plot_rtp_rate, [
     #  'sender.stderr.feather'], 'rtp_send_rate.png'),
     # ('RTP Recv Rate', plotters.plot_rtp_rate, [
     #  'receiver.stderr.feather'], 'rtp_recv_rate.png'),
+
+    # combined rates
+    ('Send Rates (logging)', plotters.plot_all_send_rates, [
+     'tc.feather', 'sender.stderr.feather'], 'all_send_rates.png'),
+    ('Receive Rates (logging)', plotters.plot_all_recv_rates, [
+     'tc.feather', 'sender.stderr.feather', 'receiver.stderr.feather'], 'all_recv_rates.png'),
+
+    # loss
     ('RTP Loss Rate (pcap)', plotters.plot_rtp_loss_pcap, ['ns4.rtp.feather',
      'ns1.rtp.feather'], 'rtp_loss.png'),
     ('RTP Loss Rate (logging)', plotters.plot_rtp_loss_log, ['sender.stderr.feather',
      'receiver.stderr.feather'], 'rtp_loss_log.png'),
+
+    # OWD
     ('RTP OWD (pcap)', plotters.plot_rtp_owd_pcap, ['ns4.rtp.feather',
      'ns1.rtp.feather'], 'rtp_owd.png'),
     ('RTP OWD (logging)', plotters.plot_rtp_owd_log, ['sender.stderr.feather',
      'receiver.stderr.feather'], 'rtp_owd_log.png'),
-    ('QUIC OWD (logging)', plotters.plot_qloq_owd, ['sender.feather',
+    ('QUIC OWD (qlog)', plotters.plot_qloq_owd, ['sender.feather',
      'receiver.feather'], 'quic_owd.png'),
+
+    # DTLS
+    ('DLTS OWD (pcap)', plotters.plot_dlts_owd, ['ns4.dtls.feather',
+     'ns1.dtls.feather', 'config.feather'], 'dtls_owd.png'),
+    ('DLTS loss (pcap)', plotters.plot_dlts_loss, ['ns4.dtls.feather',
+     'ns1.dtls.feather', 'config.feather'], 'dtls_loss.png'),
+    ('DLTS rate (pcap)', plotters.plot_dlts_rates, [
+        'tc.feather', 'sender.stderr.feather', 'ns4.dtls.feather', 'ns1.dtls.feather',
+        'config.feather'], 'dtls_rate.png'),
+
+    # CC stats
     ('SCReAM Queue Delay', plotters.plot_scream_queue_delay,
      ['sender.stderr.feather'], 'scream_queue_delay.png'),
     ('SCReAM CWND', plotters.plot_scream_cwnd, [
@@ -53,13 +72,6 @@ plots = [
      ['sender.stderr.feather'], 'gcc_usage_state.png'),
     ('SCTP Stats', plotters.plot_sctp_stats,
      ['sender.stderr.sctp.feather'], 'sctp_stats.png'),
-    ('DLTS OWD (pcap)', plotters.plot_dlts_owd, ['ns4.dtls.feather',
-     'ns1.dtls.feather', 'config.feather'], 'dtls_owd.png'),
-    ('DLTS loss (pcap)', plotters.plot_dlts_loss, ['ns4.dtls.feather',
-     'ns1.dtls.feather', 'config.feather'], 'dtls_loss.png'),
-    ('DLTS rate (pcap)', plotters.plot_dlts_rates, [
-        'tc.feather', 'sender.stderr.feather', 'ns4.dtls.feather', 'ns1.dtls.feather',
-        'config.feather'], 'dtls_rate.png'),
 
     ('Encoding frame sizes', plotters.plot_encoding_frame_size, [
      'sender.stderr.feather'], 'encoding_frame_sizes.png'),
@@ -78,18 +90,18 @@ plots = [
 ]
 
 
-async def parse_file(input, out_dir):
+async def parse_file(input, out_dir, ref_time=None):
     path = Path(input)
     if path.name in ['config.json', 'tc.log', 'receiver.stderr.log', 'sender.stderr.log']:
         df = parsers.parse_json_log(input)
         serializers.write_feather(
             df, Path(out_dir) / Path(input).with_suffix('.feather').name)
     if path.name in ['sender.qlog', 'receiver.qlog']:
-        df = parsers.parse_qlog(input)
+        df = parsers.parse_qlog(input, ref_time)
         serializers.write_feather(
             df, Path(out_dir) / Path(input).with_suffix('.feather').name)
     if path.name in ['sender.stderr.log']:
-        df = parsers.parse_pion_sctp_log(input)
+        df = parsers.parse_pion_sctp_log(input, ref_time)
         serializers.write_feather(
             df, Path(out_dir) / Path(input).with_suffix('.sctp.feather').name)
     if path.suffix == '.pcap':
@@ -110,11 +122,27 @@ async def parse_file(input, out_dir):
             df, Path(out_dir) / Path(Path(input).stem + '.feather'))
 
 
+async def parse_config(input_dir):
+    """parses config without saving it"""
+    config_path = Path(input_dir) / Path('config.json')
+    if not config_path.is_file():
+        raise FileNotFoundError(f'config.json not found in {input_dir}')
+
+    df = parsers.parse_json_log_no_convert(config_path)
+
+    return df
+
+
 async def parse_all_cmd(args):
     dir = Path(args.input)
+
+    # Parse config.json to get timezone
+    config = await parse_config(dir)
+    ref = pd.Timestamp(config['time'][0])
+
     for file in dir.iterdir():
         if file.is_file():
-            await parse_file(file, args.output)
+            await parse_file(file, args.output, ref_time=ref)
 
 
 async def parse_cmd(args):
