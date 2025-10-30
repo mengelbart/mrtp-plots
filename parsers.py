@@ -10,15 +10,24 @@ def parse_csv(csv_file):
     return df
 
 
-def parse_json_log(log_file):
+def parse_json_log_no_convert(log_file):
     with open(log_file, 'r') as f:
         data = _read_json_lines(f)
 
     df = pd.json_normalize(data)
+
     return df
 
 
-def parse_pion_sctp_log(log_file):
+def parse_json_log(log_file):
+    df = parse_json_log_no_convert(log_file)
+    df["time"] = pd.to_datetime(df["time"]).dt.tz_convert(
+        'UTC').dt.tz_localize(None)
+
+    return df
+
+
+def parse_pion_sctp_log(log_file, ref_time):
     with open(log_file, 'r') as f:
         data = [line for line in f if line.startswith("sctp TRACE:")]
 
@@ -36,22 +45,41 @@ def parse_pion_sctp_log(log_file):
                 time_val = pd.to_datetime(time_str)
 
                 cwnd_records.append(
-                    {'pion-time': time_val, 'cwnd': cwnd, 'msg': "pion-sctp-cwnd"})
+                    {'time': time_val, 'cwnd': cwnd, 'msg': "pion-sctp-cwnd"})
 
-    if cwnd_records:
-        return pd.DataFrame(cwnd_records)
-    return pd.DataFrame()
+    if not cwnd_records:
+        return pd.DataFrame()
+
+    df = pd.DataFrame(cwnd_records)
+    if ref_time is None:
+        return df
+
+    # add date to time
+    day_offset = pd.Timestamp(ref_time.date())
+    df['time'] = df['time'].apply(lambda t: t.replace(
+        year=day_offset.year, month=day_offset.month, day=day_offset.day))
+
+    df["time"] = pd.to_datetime(df["time"]).dt.tz_localize(
+        ref_time.tz).dt.tz_convert('UTC').dt.tz_localize(None)
+
+    return df
 
 
-def parse_qlog(log_file):
+def parse_qlog(log_file, ref_time):
     with open(log_file, 'r') as f:
         data = _read_json_lines(f)
 
     reference_time = data[0]['trace']["common_fields"]['reference_time']
     df = pd.json_normalize(data)
 
+    # TODO: use more sophisticated filtering to filter handshake packets out
+    df = df[df['data.header.packet_number'] >= 2]
+
     # add reference time to all relative timestamps
     df["time"] = pd.to_datetime(df["time"] + reference_time, unit="ms")
+
+    # unix timestamps are always in UTC, nothing to convert
+
     return df
 
 
@@ -115,19 +143,24 @@ async def parse_pcap(pcap_file):
     rtcp_df = pd.DataFrame()
     dtls_df = pd.DataFrame()
 
+    # pcap timestmaps are in UTC
+
     if len(rtp_data) > 0:
         rtp_df = pd.DataFrame(rtp_data)
-        rtp_df['time'] = pd.to_datetime(rtp_df['time'], format='ISO8601')
+        rtp_df['time'] = pd.to_datetime(
+            rtp_df['time'], format='ISO8601').dt.tz_localize(None)
         rtp_df = rtp_df.set_index('time')
 
     if len(rtcp_data) > 0:
         rtcp_df = pd.DataFrame(rtcp_data)
-        rtcp_df['time'] = pd.to_datetime(rtcp_df['time'], format='ISO8601')
+        rtcp_df['time'] = pd.to_datetime(
+            rtcp_df['time'], format='ISO8601').dt.tz_localize(None)
         rtcp_df = rtcp_df.set_index('time')
 
     if len(dtls_data) > 0:
         dtls_df = pd.DataFrame(dtls_data)
-        dtls_df['time'] = pd.to_datetime(dtls_df['time'], format='ISO8601')
+        dtls_df['time'] = pd.to_datetime(
+            dtls_df['time'], format='ISO8601').dt.tz_localize(None)
         dtls_df = dtls_df.set_index('time')
 
     return rtp_df, rtcp_df, dtls_df

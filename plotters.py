@@ -90,6 +90,30 @@ def plot_rtp_rates_pcaps(ax, start_time, cap_df, tx_log_df, rtp_tx_df, rtp_rx_df
     return True
 
 
+def plot_quic_rates(ax, start_time, cap_df, tx_log_df, qlog_tx_df, qlog_rx_df):
+    """plots quic rates from qlogs"""
+
+    plot_capacity(ax, start_time, cap_df)
+    plot_target_rate(ax, start_time, tx_log_df)
+
+    quic_tx_latency_df = qlog_tx_df[qlog_tx_df['name']
+                                    == 'transport:packet_sent'].copy()
+    quic_rx_latency_df = qlog_rx_df[qlog_rx_df['name']
+                                    == 'transport:packet_received'].copy()
+
+    if quic_tx_latency_df.empty or quic_rx_latency_df.empty:
+        return False
+
+    quic_tx_latency_df['rate'] = quic_tx_latency_df['data.raw.length'] * 80
+    _plot_data_rate(ax, start_time, quic_tx_latency_df, 'tx')
+
+    quic_rx_latency_df['rate'] = quic_rx_latency_df['data.raw.length'] * 80
+    _plot_data_rate(ax, start_time, quic_rx_latency_df, 'rx')
+
+    _rate_plot_ax_config(ax)
+    return True
+
+
 def plot_all_send_rates(ax, start_time, cap_df, tx_df):
     plot_capacity(ax, start_time, cap_df)
     plot_target_rate(
@@ -188,7 +212,8 @@ def plot_data_rate(ax, start_time, df, label, event_name='DataSource sent data')
 
 def _plot_rate(ax, start_time, df, label):
     """time as index and rate as column"""
-    df = df.resample('100ms').sum().copy()
+    df = df.resample('100ms').sum(numeric_only=True).copy()
+
     df['second'] = (df.index - start_time).total_seconds()
     df.set_index('second', inplace=True)
     ax.plot(df.index, df['rate'], label=label, linewidth=0.5)
@@ -197,8 +222,7 @@ def _plot_rate(ax, start_time, df, label):
 
 
 def _plot_data_rate(ax, start_time, df, label):
-    df['timestamp'] = pd.to_datetime(df['time'])
-    df.set_index('timestamp', inplace=True)
+    df.set_index('time', inplace=True)
     return _plot_rate(ax, start_time, df, label)
 
 
@@ -299,16 +323,8 @@ def plot_qloq_owd(ax, start_time, qlog_tx_df, qlog_rx_df):
     quic_rx_latency_df = qlog_rx_df[qlog_rx_df['name']
                                     == 'transport:packet_received'].copy()
 
-    tzinfo = getattr(start_time, 'tzinfo', None)
-
     if quic_tx_latency_df.empty or quic_rx_latency_df.empty:
         return False
-
-    # TODO: should be done in parsing step
-    quic_tx_latency_df['time'] = quic_tx_latency_df['time'].dt.tz_localize(
-        'UTC').dt.tz_convert(tzinfo)
-    quic_rx_latency_df['time'] = quic_rx_latency_df['time'].dt.tz_localize(
-        'UTC').dt.tz_convert(tzinfo)
 
     quic_tx_latency_df['ts'] = quic_tx_latency_df['time']
     quic_rx_latency_df['ts'] = quic_rx_latency_df['time']
@@ -473,16 +489,6 @@ def plot_sctp_stats(ax, start_time, df):
     if df.empty:
         return False
 
-    # TODO: should be done in parsing step
-    tzinfo = getattr(start_time, 'tzinfo', None)
-    df['time'] = pd.to_datetime(df['pion-time'])
-    df['time'] = df['time'].dt.tz_localize(tzinfo)
-
-    # Add only the day of start_time to each timestamp
-    day_offset = pd.Timestamp(start_time.date())
-    df['time'] = df['time'].apply(lambda t: t.replace(
-        year=day_offset.year, month=day_offset.month, day=day_offset.day))
-
     df = set_start_time_index(df, start_time, 'time')
     ax.step(df.index, df['cwnd'], where='post',
             label='sctp cwnd', linewidth=0.5)
@@ -575,6 +581,7 @@ def plot_video_quality(ax, start_time, qm_df):
     ax_ssim.plot(qm_df["n"], qm_df["ssim_avg"],
                  linestyle="-", marker="", label="ssim avg", color="tab:orange")
 
+    ax_psnr.set_xlabel("Frames")
     ax_psnr.set_ylabel("PSNR (dB)", color="tab:blue")
     ax_ssim.set_ylabel("SSIM", color="tab:orange")
 
