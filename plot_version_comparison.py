@@ -135,11 +135,42 @@ def plot_target_rate(testtype, cases, out):
     _save_rate_graph(ax, fig, image_name, legend, "Rate")
 
 
+def plot_video_quality(testtype, cases, out):
+    legend = []
+    image_name = Path(out) / Path(f"{testtype}_quality.png")
+
+    fig, ax = plt.subplots(dpi=FIG_DPI, figsize=FIG_SIZE)
+
+    # graphs
+    for case in cases:
+        feather_file = Path(case[1]) / Path("video.quality.feather")
+        if not feather_file.is_file():
+            continue
+
+        df = serializers.read_feather(feather_file)
+
+        ax.plot(df["n"], df["ssim_avg"], linestyle="-", marker="")
+
+        legend.append(case[2])
+
+    ax.set_xlim(right=3000, left=0)
+
+    ax.legend(legend)
+    ax.set_ylabel("ssim avg")
+    ax.set_xlabel("frames")
+    ax.set_title(image_name.name.split("/")[-1].replace(".png", ""))
+
+    fig.tight_layout()
+    fig.savefig(image_name, bbox_inches="tight")
+    plt.close()
+
+
 def plot_everything(testtype, cases, out):
     """Plots all version comparison plots"""
     plot_delay(testtype, cases, out)
     plot_send_rate(testtype, cases, out)
     plot_target_rate(testtype, cases, out)
+    plot_video_quality(testtype, cases, out)
 
 
 def get_test_types(testcases):
