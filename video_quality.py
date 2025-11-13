@@ -147,14 +147,16 @@ def remove_frames(ref_file: Path, lost_frames, out_file: Path, num_frames: int):
         print(f"\nFinished copy: ref video has {frames_written} frames")
 
 
-def calculate_quality_metrics(ref_file, dist_file, out_dir):
+def calculate_quality_metrics(ref_file, input_dir, out_dir):
+    dist_file = Path(input_dir) / "out.y4m"
+
     cam = cv2.VideoCapture(ref_file)
     fps = cam.get(cv2.CAP_PROP_FPS)
 
-    lost_frames = get_lost_frames(f'{out_dir}/sender.stderr.log',
-                                  f'{out_dir}/receiver.stderr.log')
+    lost_frames = get_lost_frames(f'{input_dir}/sender.stderr.log',
+                                  f'{input_dir}/receiver.stderr.log')
 
-    config = parsers.parse_json_log_no_convert(f'{out_dir}/config.json')
+    config = parsers.parse_json_log_no_convert(f'{input_dir}/config.json')
     duration = config['duration'][0]
     num_frames = int(fps * duration)
 
@@ -168,14 +170,14 @@ def calculate_quality_metrics(ref_file, dist_file, out_dir):
         export_lost_frames_csv(lost_frames, lost_frame_log)
 
         qm = ffmpeg.FfmpegQualityMetrics(
-            ref=str(tmp_file), dist=dist_file, framerate=fps, progress=True)
+            ref=str(tmp_file), dist=str(dist_file), framerate=fps, progress=True)
         qm.calculate()
 
         tmp_file.unlink()
 
     else:
         qm = ffmpeg.FfmpegQualityMetrics(
-            ref=ref_file, dist=dist_file, framerate=fps, progress=True, num_frames=num_frames)
+            ref=ref_file, dist=str(dist_file), framerate=fps, progress=True, num_frames=num_frames)
 
         qm.calculate()
 

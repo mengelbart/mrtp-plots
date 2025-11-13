@@ -185,8 +185,7 @@ async def plot_combis_cmd(args):
 
 
 async def calc_video_metrics(args):
-    video_quality.calculate_quality_metrics(
-        args.reference, args.distorted, args.output)
+    video_quality.calculate_quality_metrics(args.reference, args.input, args.output)
 
 
 def main():
@@ -237,9 +236,9 @@ def main():
     video_qm.add_argument(
         '-r', '--reference', help='reference video', required=True)
     video_qm.add_argument(
-        '-d', '--distorted', help='distorted video', required=True)
+        '-i', '--input', help='folder that contains the test results, including the video with the name out.y4m', required=True)
     video_qm.add_argument(
-        '-o', '--output', help='output directory for result csv', required=True)
+        '-o', '--output', help='output directory for result csv\'s', required=True)
     video_qm.set_defaults(func=calc_video_metrics)
 
     args = parser.parse_args()
