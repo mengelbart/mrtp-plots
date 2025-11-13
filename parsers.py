@@ -65,7 +65,7 @@ def parse_pion_sctp_log(log_file, ref_time):
     return df
 
 
-def parse_qlog(log_file, ref_time):
+def parse_qlog(log_file):
     with open(log_file, 'r') as f:
         data = _read_json_lines(f)
 

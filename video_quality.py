@@ -1,8 +1,8 @@
 from pathlib import Path
-import subprocess
+
 import cv2
 import ffmpeg_quality_metrics as ffmpeg
-import shutil
+from pandas import DataFrame
 
 import parsers
 
@@ -48,15 +48,27 @@ def get_lost_frames(sender_log_file, receiver_log_file):
     lost_frames_df = lost_frames_df[lost_frames_df['rtp-timestamp_mapping']
                                     <= max_rx_timestamp]
 
-    for _, row in lost_frames_df.iterrows():
-        print(
-            f"Lost frame: frame Nr: {row['frame-count_ori']}, Timestamp: {row['rtp-timestamp_mapping']}")
-
     return lost_frames_df
+
+
+def export_lost_frames_csv(lost_frames: DataFrame, out_file: Path):
+    export_df = lost_frames[['frame-count_ori', 'rtp-timestamp_mapping']]
+    export_df = export_df.rename(columns={
+        'frame-count_ori': 'frame_number',
+        'rtp-timestamp_mapping': 'rtp_timestamp'
+    })
+    export_df.to_csv(out_file, index=False)
 
 
 def remove_frames(ref_file: Path, lost_frames, out_file: Path, num_frames: int):
     frames_to_skip = sorted(lost_frames['frame-count_ori'].astype(int))
+
+    # Example:
+    # YUV4MPEG2 <tagged-fields>\n
+    # FRAME <tagged-fields>\n
+    # data...FRAME <tagged-fields>\n
+    # data...FRAME <tagged-fields>\n
+    # data...
 
     with open(ref_file, 'rb') as infile, open(out_file, 'wb') as outfile:
         header = infile.readline()
@@ -71,9 +83,41 @@ def remove_frames(ref_file: Path, lost_frames, out_file: Path, num_frames: int):
         width = int(header_str.split('W')[1].split()[0])
         height = int(header_str.split('H')[1].split()[0])
 
-        # TODO: what about other formats
-        # YUV420 frame size
-        frame_data_size = width * height + 2 * ((width // 2) * (height // 2))
+        chroma_format = ''
+        if 'C' in header_str:
+            chroma_tag = header_str.split('C')[1].split()[0]
+            if chroma_tag.startswith('420'):
+                chroma_format = '420'
+            elif chroma_tag.startswith('422'):
+                chroma_format = '422'
+            elif chroma_tag.startswith('444'):
+                chroma_format = '444'
+            elif chroma_tag.startswith('mono'):
+                chroma_format = 'mono'
+            else:
+                raise ValueError(
+                    "Could not determine chroma format from Y4M header")
+
+        frame_pixels = width * height
+
+        frame_data_size = 0
+        if chroma_format == '420':
+            # 4:2:0 - for every 4 luma -> two chroma => 0.5 chroma per luma
+            frame_data_size = int(frame_pixels * 1.5)
+
+        elif chroma_format == '422':
+            # 4:2:2 - For every 2 luma -> two choma ==> 1 chroma per luma
+            frame_data_size = frame_pixels * 2
+
+        elif chroma_format == '444':
+            # 4:4:4 - For every luma -> 2 chroma per luma
+            frame_data_size = frame_pixels * 3
+
+        elif chroma_format == 'mono':
+            # Monochrome - luma only
+            frame_data_size = frame_pixels
+        else:
+            raise ValueError("Unsupported chroma format")
 
         frame_idx = 0
         frames_written = 0
@@ -100,7 +144,7 @@ def remove_frames(ref_file: Path, lost_frames, out_file: Path, num_frames: int):
             if frame_idx % 100 == 0:
                 print(f"Processed {frame_idx}/{num_frames} frames", end='\r')
 
-        print(f"\nWrote {frames_written} frames")
+        print(f"\nFinished copy: ref video has {frames_written} frames")
 
 
 def calculate_quality_metrics(ref_file, dist_file, out_dir):
@@ -110,11 +154,18 @@ def calculate_quality_metrics(ref_file, dist_file, out_dir):
     lost_frames = get_lost_frames(f'{out_dir}/sender.stderr.log',
                                   f'{out_dir}/receiver.stderr.log')
 
-    num_frames = 3100  # TODO: get from config
+    config = parsers.parse_json_log_no_convert(f'{out_dir}/config.json')
+    duration = config['duration'][0]
+    num_frames = int(fps * duration)
 
     if len(lost_frames) > 0:
-        tmp_file = Path(f"{out_dir}/tmp_ref_file.y4m")
+        print("Distorted video has missing frames. Create copy of reference and remove missing frames...")
+
+        tmp_file = Path(out_dir) / "tmp_ref_file.y4m"
+        lost_frame_log = Path(out_dir) / "lost_frames.csv"
+
         remove_frames(Path(ref_file), lost_frames, tmp_file, num_frames)
+        export_lost_frames_csv(lost_frames, lost_frame_log)
 
         qm = ffmpeg.FfmpegQualityMetrics(
             ref=str(tmp_file), dist=dist_file, framerate=fps, progress=True)
