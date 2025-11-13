@@ -128,7 +128,7 @@ def plot_target_rate(testtype, cases, out):
         feather_file = f"{case[1]}/sender.stderr.feather"
         df = serializers.read_feather(feather_file)
         plotters.plot_target_rate(
-            ax, start_time, df, event_name="NEW_TARGET_RATE")
+            ax, start_time, df, event_name="NEW_TARGET_MEDIA_RATE")
 
         legend.append(case[2])
 

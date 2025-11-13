@@ -328,7 +328,6 @@ def plot_qloq_owd(ax, start_time, qlog_tx_df, qlog_rx_df):
 
     quic_tx_latency_df['ts'] = quic_tx_latency_df['time']
     quic_rx_latency_df['ts'] = quic_rx_latency_df['time']
-
     return _plot_owd(ax, start_time, quic_tx_latency_df, quic_rx_latency_df, 'data.header.packet_number')
 
 
@@ -588,9 +587,9 @@ def plot_video_quality(ax, start_time, qm_df):
     ax_psnr.tick_params(axis='y', labelcolor="tab:blue")
     ax_ssim.tick_params(axis='y', labelcolor="tab:orange")
 
+    ax_psnr.grid(True, axis='y', linestyle='--', alpha=0.3, color="tab:blue")
+
     ax_psnr.legend(loc='upper left')
     ax_ssim.legend(loc='upper right')
-
-    ax_psnr.set_xlim(right=3000, left=0)
 
     return True
