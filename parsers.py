@@ -69,16 +69,18 @@ def parse_qlog(log_file):
     with open(log_file, 'r') as f:
         data = _read_json_lines(f)
 
-    reference_time = data[0]['trace']["common_fields"]['reference_time']
+    # reference time is in local time zone
+    reference_time = data[0]['trace']["common_fields"]['reference_time']["wall_clock_time"]
+    reference_time = pd.to_datetime(
+        reference_time).tz_convert('UTC').tz_localize(None)
+
     df = pd.json_normalize(data)
 
     # TODO: use more sophisticated filtering to filter handshake packets out
     df = df[df['data.header.packet_number'] >= 2]
 
     # add reference time to all relative timestamps
-    df["time"] = pd.to_datetime(df["time"] + reference_time, unit="ms")
-
-    # unix timestamps are always in UTC, nothing to convert
+    df["time"] = pd.to_timedelta(df["time"], unit="ms") + reference_time
 
     return df
 

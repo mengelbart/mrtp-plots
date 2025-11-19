@@ -179,7 +179,13 @@ def get_test_types(testcases):
     return set(testtypes)
 
 
-def plot_it(testcases, out):
+def _get_link_types(testcases):
+    """Get all unique link types in testcase tuple list. Types: static, ..."""
+    linktypes = [case[0].split("_")[0] for case in testcases]
+    return set(linktypes)
+
+
+def plot_by_testtype(testcases, out):
     sorted_testcases = sorted(testcases, key=lambda tup: tup[2])
 
     testtypes = get_test_types(sorted_testcases)
@@ -188,6 +194,18 @@ def plot_it(testcases, out):
     for testtype in testtypes:
         cases = list(
             filter(lambda case: case[0] == testtype, sorted_testcases))
+        plot_everything(testtype, cases, out)
+
+
+def plot_by_link(testcases, out):
+    sorted_testcases = sorted(testcases, key=lambda tup: tup[2])
+
+    testtypes = _get_link_types(sorted_testcases)
+
+    # plot for each test type
+    for testtype in testtypes:
+        cases = list(
+            filter(lambda case: case[0].split("_")[0] == testtype, sorted_testcases))
         plot_everything(testtype, cases, out)
 
 
@@ -207,5 +225,11 @@ def get_all_iter_testcases(dir: str):
     return testcases
 
 
+def plot_link_comparision(input: str, output: str):
+    """Combine results per link type. E.g. each static test combined"""
+    plot_by_link(get_all_iter_testcases(input), output)
+
+
 def plot_version_comparison(input: str, output: str):
-    plot_it(get_all_iter_testcases(input), output)
+    """Combine results per version. E.g. each iteration of webrtc-gcc-pacing"""
+    plot_by_testtype(get_all_iter_testcases(input), output)
