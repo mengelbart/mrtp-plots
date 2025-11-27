@@ -7,17 +7,11 @@ from pandas import DataFrame
 import parsers
 
 
-def get_lost_frames(sender_log_file, receiver_log_file):
-    tx_df = parsers.parse_json_log(sender_log_file)
-    rx_df = parsers.parse_json_log(receiver_log_file)
-
+def map_frames_sender_pipeline(tx_df):
     tx_before_enc = tx_df[tx_df['msg'] == 'encoder sink'].copy()
 
     tx_mapping = tx_df[tx_df['msg'] == 'rtp to pts mapping'].copy()
-    rx_mapping = rx_df[rx_df['msg'] == 'rtp to pts mapping'].copy()
-
     tx_frames = tx_df[tx_df['msg'] == 'encoder src'].copy()
-    rx_frames = rx_df[rx_df['msg'] == 'decoder src']
 
     # encoder starts at different timepoint => shift pts to 0
     tx_frame_min_pts = tx_frames['pts'].min()
@@ -34,9 +28,26 @@ def get_lost_frames(sender_log_file, receiver_log_file):
     tx_merged = tx_all.merge(
         tx_mapping, on='pts', how='left', suffixes=('_frame', '_mapping'))
 
+    return tx_merged
+
+
+def map_frames_receiver_pipeline(rx_df):
+    rx_mapping = rx_df[rx_df['msg'] == 'rtp to pts mapping'].copy()
+    rx_frames = rx_df[rx_df['msg'] == 'decoder src']
+
     # join mapping and frames on receiver side
     rx_merged = rx_mapping.merge(
         rx_frames, on='pts', how='inner', suffixes=('_mapping', '_frame'))
+
+    return rx_merged
+
+
+def get_lost_frames(sender_log_file, receiver_log_file):
+    tx_df = parsers.parse_json_log(sender_log_file)
+    tx_merged = map_frames_sender_pipeline(tx_df)
+
+    rx_df = parsers.parse_json_log(receiver_log_file)
+    rx_merged = map_frames_receiver_pipeline(rx_df)
 
     # Left anti join: get rows from tx_merged where rtp-timestamp is NOT in rx_merged
     # <=> all frames that where not played out

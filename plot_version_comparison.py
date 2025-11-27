@@ -47,7 +47,7 @@ def _plot_capacity(ax, legend, path_to_case):
 def plot_delay(testtype, cases, out):
     """Creates combined delay plot"""
     legend = []
-    image_name = Path(out) / Path(f"{testtype}_delay.png")
+    image_name = Path(out) / Path(f"{testtype}_fdelay.png")
 
     fig, ax = plt.subplots(dpi=FIG_DPI, figsize=FIG_SIZE)
 
@@ -61,7 +61,7 @@ def plot_delay(testtype, cases, out):
             df_recv = serializers.read_feather(feather_recv)
             df_sender = serializers.read_feather(feather_sender)
 
-            plotted = plotters.plot_rtp_owd_log(
+            plotted = plotters.plot_frame_latency(
                 ax, start_time, df_sender, df_recv)
 
             if plotted:
@@ -104,6 +104,7 @@ def plot_send_rate(testtype, cases, out):
             plotted = plotters.plot_rtp_rate(ax, start_time, df, case[2])
             if plotted:
                 legend.append(case[2] + " rtp")
+                continue
 
             plotted = plotters.plot_data_rate(ax, start_time, df, case[2])
             if plotted:

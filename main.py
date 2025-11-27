@@ -17,11 +17,11 @@ import video_quality
 
 plots = [
     # RTP rates
-    ('RTP Rates (logging)', plotters.plot_rtp_rates_log, [
-     'tc.feather', 'sender.stderr.feather', 'receiver.stderr.feather'], 'rtp_rates_logs.png'),
-    ('RTP Rates (pcaps)', plotters.plot_rtp_rates_pcaps, [
+    # ('RTP Rates (logging)', plotters.plot_rtp_rates_log, [
+    #  'tc.feather', 'sender.stderr.feather', 'receiver.stderr.feather'], 'rtp_rates_logs.png'),
+    ('RTP Network Rates (pcaps)', plotters.plot_rtp_rates_pcaps, [
      'tc.feather', 'sender.stderr.feather', 'ns4.rtp.feather', 'ns1.rtp.feather', 'config.feather'], 'rtp_rates.png'),
-    ('QUIC Rates (qlog)', plotters.plot_quic_rates, [
+    ('QUIC Network Rates (qlog)', plotters.plot_quic_rates, [
      'tc.feather', 'sender.stderr.feather', 'sender.feather', 'receiver.feather'], 'quic_rates.png'),
     # ('RTP Send Rate', plotters.plot_rtp_rate, [
     #  'sender.stderr.feather'], 'rtp_send_rate.png'),
@@ -35,17 +35,17 @@ plots = [
      'tc.feather', 'sender.stderr.feather', 'receiver.stderr.feather'], 'all_recv_rates.png'),
 
     # loss
-    ('RTP Loss Rate (pcap)', plotters.plot_rtp_loss_pcap, ['ns4.rtp.feather',
+    ('RTP Network Loss Rate (pcap)', plotters.plot_rtp_loss_pcap, ['ns4.rtp.feather',
      'ns1.rtp.feather'], 'rtp_loss.png'),
     ('RTP Loss Rate (logging)', plotters.plot_rtp_loss_log, ['sender.stderr.feather',
      'receiver.stderr.feather'], 'rtp_loss_log.png'),
 
     # OWD
-    ('RTP OWD (pcap)', plotters.plot_rtp_owd_pcap, ['ns4.rtp.feather',
+    ('Network OWD (RTP pcap)', plotters.plot_rtp_owd_pcap, ['ns4.rtp.feather',
      'ns1.rtp.feather'], 'rtp_owd.png'),
-    ('RTP OWD (logging)', plotters.plot_rtp_owd_log, ['sender.stderr.feather',
-     'receiver.stderr.feather'], 'rtp_owd_log.png'),
-    ('QUIC OWD (qlog)', plotters.plot_qloq_owd, ['sender.feather',
+    ('RTP OWD', plotters.plot_rtp_owd_log_udp, ['sender.stderr.feather',
+     'receiver.stderr.feather', 'ns4.rtp.feather', 'ns1.rtp.feather', 'config.feather'], 'rtp_owd_log.png'),
+    ('Network OWD (QUIC qlog)', plotters.plot_qloq_owd, ['sender.feather',
      'receiver.feather'], 'quic_owd.png'),
 
     # DTLS
@@ -85,6 +85,8 @@ plots = [
 
     ('E2E Latency', plotters.plot_e2e_latency, [
      'sender.stderr.feather', 'receiver.stderr.feather'], 'e2e_latency.png'),
+    ('Frame Latency e2e', plotters.plot_frame_latency, [
+     'sender.stderr.feather', 'receiver.stderr.feather'], 'frame_latency.png'),
     ('Video Quality Metrics', plotters.plot_video_quality, [
      'video.quality.feather'], 'video_quality.png'),
 ]

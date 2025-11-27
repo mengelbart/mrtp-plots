@@ -3,6 +3,8 @@ import re
 import matplotlib.ticker as mticker
 import pandas as pd
 
+import video_quality
+
 unit_multipliers = {
     'bit': 1,
     'kbit': 1_000,
@@ -117,7 +119,8 @@ def plot_quic_rates(ax, start_time, cap_df, tx_log_df, qlog_tx_df, qlog_rx_df):
 def plot_all_send_rates(ax, start_time, cap_df, tx_df):
     plot_capacity(ax, start_time, cap_df)
     plot_target_rate(
-        ax, start_time, tx_df, event_name='NEW_TARGET_RATE')
+        ax, start_time, tx_df, event_name='NEW_TARGET_RATE', label='tr all')
+    plot_target_rate(ax, start_time, tx_df, label='tr media')
     tx_data_plotted, data_df = plot_data_rate(ax, start_time, tx_df, 'data')
 
     # only plot if data was sent
@@ -181,12 +184,12 @@ def plot_capacity(ax, start_time, df):
                 label='capacity', linewidth=0.5, color="lightskyblue")
 
 
-def plot_target_rate(ax, start_time, df, event_name='NEW_TARGET_MEDIA_RATE'):
+def plot_target_rate(ax, start_time, df, event_name='NEW_TARGET_MEDIA_RATE', label='target'):
     df = df[df['msg'] == event_name].copy()
     if df.empty:
         return False
     df = set_start_time_index(df, start_time, 'time')
-    ax.plot(df.index, df['rate'], label='target', linewidth=0.5)
+    ax.plot(df.index, df['rate'], label=label, linewidth=0.5)
     return True
 
 
@@ -331,31 +334,100 @@ def plot_qloq_owd(ax, start_time, qlog_tx_df, qlog_rx_df):
     return _plot_owd(ax, start_time, quic_tx_latency_df, quic_rx_latency_df, 'data.header.packet_number')
 
 
-def plot_rtp_owd_log(ax, start_time, rtp_tx_df, rtp_rx_df):
-    rtp_tx_latency_df = rtp_tx_df[rtp_tx_df['msg'] == 'rtp packet'].copy()
-    rtp_rx_latency_df = rtp_rx_df[rtp_rx_df['msg'] == 'rtp packet'].copy()
+def plot_rtp_owd_log_udp(ax, start_time, rtp_tx_df, rtp_rx_df, pcap_tx_df, pcap_rx_df, config_df):
+    """ for upp and webrtc transport"""
 
-    if rtp_tx_latency_df.empty or rtp_rx_latency_df.empty:
-        return False
+    # tx: mapping-log <-> pcap -> sender stack delay
+    tx_mapping = rtp_tx_df[rtp_tx_df['msg'] == 'rtp to pts mapping'].copy()
+    tx_mapping['ts'] = tx_mapping['time']
+    tx_mapping['extseq'] = tx_mapping['unwrapped-sequence-number'].astype(
+        'int64')
+    tx_mapping['extseq'] = tx_mapping['extseq'] + 65536
 
-    rtp_tx_latency_df['ts'] = pd.to_datetime(rtp_tx_latency_df['time'])
-    rtp_rx_latency_df['ts'] = pd.to_datetime(rtp_rx_latency_df['time'])
-    return _plot_owd(ax, start_time, rtp_tx_latency_df, rtp_rx_latency_df, 'rtp-packet.unwrapped-sequence-number')
+    sender_ip, receiver_ip = _get_ips_from_config(config_df)
+
+    tx_pcap = pcap_tx_df[pcap_tx_df['src'] == sender_ip].copy()
+    tx_pcap['ts'] = tx_pcap.index
+
+    send_stack_delay = _merge_owd(start_time, tx_mapping,
+                                  tx_pcap, 'extseq')
+    send_stack_delay['send_stack_delay'] = send_stack_delay['latency']
+
+    # rx: pcap <-> mapping-log -> receiver stack delay
+    rx_mapping = rtp_rx_df[rtp_rx_df['msg'] == 'rtp to pts mapping'].copy()
+    rx_mapping['ts'] = rx_mapping['time']
+    rx_mapping['extseq'] = rx_mapping['unwrapped-sequence-number'].astype(
+        'int64')
+    rx_mapping['extseq'] = rx_mapping['extseq'] + 65536
+
+    rx_pcap = pcap_rx_df[pcap_rx_df['dst'] == receiver_ip].copy()
+    rx_pcap['ts'] = rx_pcap.index
+
+    recv_stack_delay = _merge_owd(start_time, rx_pcap, rx_mapping,
+                                  'extseq')
+    recv_stack_delay['recv_stack_delay'] = recv_stack_delay['latency']
+
+    print("len recv delay: ", len(recv_stack_delay))
+
+    # tx pcaps -> rx pcaps -> network delay
+    network_delay = _merge_owd(start_time, tx_pcap, rx_pcap, 'extseq')
+    network_delay['network_delay'] = network_delay['latency']
+
+    # combine all delays
+
+    # Set extseq as index before joining
+    send_stack_delay = send_stack_delay.reset_index().set_index('extseq')
+    recv_stack_delay = recv_stack_delay.reset_index().set_index('extseq')
+    network_delay = network_delay.reset_index().set_index('extseq')
+
+    combined_df = send_stack_delay.join(
+        recv_stack_delay, how='inner', lsuffix='', rsuffix='_recv')
+    combined_df = combined_df.join(
+        network_delay, how='inner', lsuffix='', rsuffix='_network')
+
+    ax.stackplot(combined_df['second'],
+                 combined_df['send_stack_delay'],
+                 combined_df['network_delay'],
+                 combined_df['recv_stack_delay'],
+                 labels=['send stack', 'network', 'recv stack'],
+                 alpha=0.7)
+
+    ax.legend()
+
+    _plot_owd_settings(ax)
+    return True
 
 
-def _plot_owd(ax, start_time, rtp_tx_latency_df, rtp_rx_latency_df, seq_nr_name):
+def plot_rtp_owd_log_roq(ax, start_time, rtp_tx_df, rtp_rx_df, quic_tx_df, quic_rx_df):
+    """ for roq transport"""
+    # TODO: implement
+    return False
+
+
+def _merge_owd(start_time, rtp_tx_latency_df, rtp_rx_latency_df, seq_nr_name):
     merged_df = rtp_tx_latency_df.merge(rtp_rx_latency_df, on=seq_nr_name)
     merged_df['latency'] = (merged_df['ts_y'] - merged_df['ts_x']) / \
         datetime.timedelta(milliseconds=1) / 1000.0
     df = set_start_time_index(merged_df, start_time, 'ts_x')
+    return df
+
+
+def _plot_owd(ax, start_time, rtp_tx_latency_df, rtp_rx_latency_df, seq_nr_name):
+    df = _merge_owd(start_time, rtp_tx_latency_df,
+                    rtp_rx_latency_df, seq_nr_name)
     ax.plot(df.index, df['latency'], label='Latency', linewidth=0.5)
+    _plot_owd_settings(ax)
+    return True
+
+
+def _plot_owd_settings(ax):
     # ax.set_ylim(bottom=0, top=0.5)
     ax.set_xlabel('Time')
     ax.set_ylabel('Latency')
     ax.xaxis.set_major_formatter(
         mticker.FuncFormatter(lambda x, pos: f'{x:.0f}s'))
     ax.yaxis.set_major_formatter(mticker.EngFormatter(unit='s'))
-    return True
+    ax.grid(True, axis='y', linestyle='--', alpha=0.3)
 
 
 def plot_scream_queue_delay(ax, start_time, df):
@@ -568,6 +640,34 @@ def plot_e2e_latency(ax, start_time, encoding_df, decoding_df):
     ax.bar(df.index, df['latency'], label='E2E Latency')
     ax.yaxis.set_major_formatter(mticker.EngFormatter(unit='s'))
     ax.legend(loc='upper right')
+    return True
+
+
+def plot_frame_latency(ax, start_time, tx_df, rx_df):
+    tx_merged = video_quality.map_frames_sender_pipeline(tx_df)
+    rx_merged = video_quality.map_frames_receiver_pipeline(rx_df)
+
+    merged_df = tx_merged.merge(
+        rx_merged, on='rtp-timestamp_mapping', suffixes=('_tx', '_rx'))
+
+    # group on time_ori and time_frame_rx and aggregate
+    grouped_df = merged_df.groupby(['time_ori', 'time_frame_rx']).agg(
+        frames_count=('rtp-timestamp_mapping', 'count')
+    ).reset_index()
+
+    grouped_df['latency'] = (
+        pd.to_datetime(grouped_df['time_frame_rx']) - pd.to_datetime(grouped_df['time_ori'])) / \
+        datetime.timedelta(milliseconds=1) / 1000.0
+
+    df = set_start_time_index(grouped_df, start_time, 'time_ori')
+    ax.plot(df.index, df['latency'], label='Latency', linewidth=0.5)
+    # ax.set_ylim(bottom=0, top=0.5)
+    ax.set_xlabel('Time')
+    ax.set_ylabel('Latency')
+    ax.xaxis.set_major_formatter(
+        mticker.FuncFormatter(lambda x, pos: f'{x:.0f}s'))
+    ax.yaxis.set_major_formatter(mticker.EngFormatter(unit='s'))
+    ax.grid(True, axis='y', linestyle='--', alpha=0.3)
     return True
 
 
