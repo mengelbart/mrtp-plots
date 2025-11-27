@@ -89,6 +89,10 @@ plots = [
      'sender.stderr.feather', 'receiver.stderr.feather'], 'frame_latency.png'),
     ('Video Quality Metrics', plotters.plot_video_quality, [
      'video.quality.feather'], 'video_quality.png'),
+    ('Encoded Video Rate', plotters.plot_video_rate, [
+     'sender.stderr.feather'], 'video_rate.png'),
+    ('Encoded Frame Sizes', plotters.plot_frame_size, [
+     'sender.stderr.feather'], 'video_frame_size.png'),
 ]
 
 
@@ -170,6 +174,7 @@ async def plot_cmd(args):
             missing = [str(p) for p in paths if not p.is_file()]
             print(
                 f'skipping plot {func.__name__} due to missing dependencies {', '.join(missing)}')
+            plt.close(fig)
             continue
         ax.set_title(title)
         fig.autofmt_xdate()

@@ -693,3 +693,42 @@ def plot_video_quality(ax, start_time, qm_df):
     ax_ssim.legend(loc='upper right')
 
     return True
+
+
+def plot_video_rate(ax, start_time, rx_df):
+    rx_data = rx_df[rx_df['msg'] == 'encoder src'].copy()
+    if rx_data.empty:
+        return False
+
+    rx_data['rate'] = rx_data['length'] * 80  # bits per second
+
+    _plot_data_rate(ax, start_time, rx_data, 'video rate')
+    _rate_plot_ax_config(ax)
+    return True
+
+
+def plot_frame_size(ax, start_time, rx_df):
+    rx_data = rx_df[rx_df['msg'] == 'encoder src'].copy()
+    if rx_data.empty:
+        return False
+
+    rx_data = rx_data.reset_index()
+
+    # histogram
+    n, bins, patches = ax.hist(rx_data['length'], bins=50, edgecolor='white',
+                               color='steelblue', alpha=0.8, label='Frame Size Distribution')
+
+    # labels for bars
+    for i in range(len(patches)):
+        if n[i] > 0:  # Only label non-zero bars
+            ax.text(patches[i].get_x() + patches[i].get_width()/2,
+                    patches[i].get_height(),
+                    f'{int(n[i])}',
+                    ha='center', va='bottom', fontsize=6)
+
+    ax.set_xlabel('Size')
+    ax.set_ylabel('Count')
+    ax.xaxis.set_major_formatter(mticker.EngFormatter(unit='B'))
+    ax.legend(loc='upper right')
+
+    return True
