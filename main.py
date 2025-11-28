@@ -37,8 +37,10 @@ plots = [
     # loss
     ('RTP Network Loss Rate (pcap)', plotters.plot_rtp_loss_pcap, ['ns4.rtp.feather',
      'ns1.rtp.feather'], 'rtp_loss.png'),
-    ('RTP Loss Rate (logging)', plotters.plot_rtp_loss_log, ['sender.stderr.feather',
-     'receiver.stderr.feather'], 'rtp_loss_log.png'),
+    ('RTP Loss Rate (network)', plotters.plot_rtp_loss_log, ['sender.stderr.feather',
+     'receiver.stderr.feather'], 'rtp_loss_net.png'),
+    ('RTP Loss Rate (after jitter)', plotters.plot_rtp_full_loss_log, ['sender.stderr.feather',
+     'receiver.stderr.feather'], 'rtp_loss_full.png'),
 
     # OWD
     ('Network OWD (RTP pcap)', plotters.plot_rtp_owd_pcap, ['ns4.rtp.feather',
@@ -93,6 +95,8 @@ plots = [
      'video.quality.feather'], 'video_quality.png'),
     ('Encoded Video Rate', plotters.plot_video_rate, [
      'sender.stderr.feather'], 'video_rate.png'),
+    ('Encoded Frame Sizes', plotters.plot_frame_size_dist, [
+     'sender.stderr.feather'], 'video_frame_size_dist.png'),
     ('Encoded Frame Sizes', plotters.plot_frame_size, [
      'sender.stderr.feather'], 'video_frame_size.png'),
 ]
