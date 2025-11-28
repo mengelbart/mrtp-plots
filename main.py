@@ -45,6 +45,8 @@ plots = [
      'ns1.rtp.feather'], 'rtp_owd.png'),
     ('RTP OWD', plotters.plot_rtp_owd_log_udp, ['sender.stderr.feather',
      'receiver.stderr.feather', 'ns4.rtp.feather', 'ns1.rtp.feather', 'config.feather'], 'rtp_owd_log.png'),
+    ('RTP OWD', plotters.plot_rtp_owd_log_roq, ['sender.stderr.feather',
+     'receiver.stderr.feather', 'sender.feather'], 'rtp_owd_quic.png'),
     ('Network OWD (QUIC qlog)', plotters.plot_qloq_owd, ['sender.feather',
      'receiver.feather'], 'quic_owd.png'),
 
