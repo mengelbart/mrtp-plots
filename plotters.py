@@ -234,10 +234,19 @@ def plot_rtp_loss_pcap(ax, start_time, rtp_tx_df, rtp_rx_df):
 
 
 def plot_rtp_loss_log(ax, start_time, rtp_tx_df, rtp_rx_df):
+    """rtp loss without jitter buffer"""
     rtp_tx_df = rtp_tx_df[rtp_tx_df['msg'] == 'rtp packet'].copy()
     rtp_rx_df = rtp_rx_df[rtp_rx_df['msg'] == 'rtp packet'].copy()
 
     return _plot_rtp_loss(ax, start_time, rtp_tx_df, rtp_rx_df, 'rtp-packet.sequence-number')
+
+
+def plot_rtp_full_loss_log(ax, start_time, rtp_tx_df, rtp_rx_df):
+    """rtp loss with jitter buffer"""
+    rtp_tx_df = rtp_tx_df[rtp_tx_df['msg'] == 'rtp to pts mapping'].copy()
+    rtp_rx_df = rtp_rx_df[rtp_rx_df['msg'] == 'rtp to pts mapping'].copy()
+
+    return _plot_rtp_loss(ax, start_time, rtp_tx_df, rtp_rx_df, 'unwrapped-sequence-number')
 
 
 def _plot_rtp_loss(ax, start_time, rtp_tx_df, rtp_rx_df, seq_nr_name):
@@ -435,7 +444,7 @@ def plot_rtp_owd_log_roq(ax, start_time, rtp_tx_df, rtp_rx_df, quic_tx_df):
                  combined_df['recv_stack_delay'],
                  labels=['quic stack + network', 'recv stack'],
                  alpha=0.7)
-    
+
     ax.legend()
     _plot_owd_settings(ax)
     return True
@@ -744,7 +753,7 @@ def plot_video_rate(ax, start_time, rx_df):
     return True
 
 
-def plot_frame_size(ax, start_time, rx_df):
+def plot_frame_size_dist(ax, start_time, rx_df):
     rx_data = rx_df[rx_df['msg'] == 'encoder src'].copy()
     if rx_data.empty:
         return False
@@ -767,5 +776,26 @@ def plot_frame_size(ax, start_time, rx_df):
     ax.set_ylabel('Count')
     ax.xaxis.set_major_formatter(mticker.EngFormatter(unit='B'))
     ax.legend(loc='upper right')
+
+    return True
+
+
+def plot_frame_size(ax, start_time, rx_df):
+    rx_data = rx_df[rx_df['msg'] == 'encoder src'].copy()
+    if rx_data.empty:
+        return False
+
+    rx_data = set_start_time_index(rx_data, start_time, 'time')
+
+    ax.scatter(rx_data.index, rx_data['length'],
+               label='Frame Size', s=8, marker='.')
+
+    ax.set_xlabel('Time')
+    ax.set_ylabel('Size')
+    ax.xaxis.set_major_formatter(
+        mticker.FuncFormatter(lambda x, pos: f'{x:.0f}s'))
+    ax.yaxis.set_major_formatter(mticker.EngFormatter(unit='B'))
+    ax.legend(loc='upper right')
+    ax.grid(True, axis='y', linestyle='--', alpha=0.3)
 
     return True
