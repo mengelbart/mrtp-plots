@@ -411,6 +411,8 @@ def plot_rtp_owd_log_roq(ax, start_time, rtp_tx_df, rtp_rx_df, quic_tx_df):
     """ for roq transport. quic_tx_df not used but makes sure it is only called for roq transport"""
 
     tx_mapping = rtp_tx_df[rtp_tx_df['msg'] == 'rtp to pts mapping'].copy()
+    if tx_mapping.empty:
+        return False
     tx_mapping['ts'] = tx_mapping['time']
     tx_mapping['extseq'] = tx_mapping['unwrapped-sequence-number'].astype(
         'int64')
@@ -459,6 +461,8 @@ def _merge_owd(start_time, rtp_tx_latency_df, rtp_rx_latency_df, seq_nr_name):
 
 
 def _plot_owd(ax, start_time, rtp_tx_latency_df, rtp_rx_latency_df, seq_nr_name):
+    if rtp_tx_latency_df.empty or rtp_rx_latency_df.empty:
+        return False
     df = _merge_owd(start_time, rtp_tx_latency_df,
                     rtp_rx_latency_df, seq_nr_name)
     ax.plot(df.index, df['latency'], label='Latency', linewidth=0.5)
@@ -690,8 +694,11 @@ def plot_e2e_latency(ax, start_time, encoding_df, decoding_df):
 
 
 def plot_frame_latency(ax, start_time, tx_df, rx_df):
-    tx_merged = video_quality.map_frames_sender_pipeline(tx_df)
-    rx_merged = video_quality.map_frames_receiver_pipeline(rx_df)
+    try:
+        tx_merged = video_quality.map_frames_sender_pipeline(tx_df)
+        rx_merged = video_quality.map_frames_receiver_pipeline(rx_df)
+    except KeyError:
+        return False
 
     merged_df = tx_merged.merge(
         rx_merged, on='rtp-timestamp_mapping', suffixes=('_tx', '_rx'))

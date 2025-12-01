@@ -104,6 +104,8 @@ async def parse_pcap(pcap_file):
     dtls_data = []
 
     def append_pkt(packet):
+        if 'IP' not in packet:
+            return
         if 'UDP' in packet and 'RTP' in packet and packet['rtp'].version.value == 2:
             rtp_data.append({
                 'time': packet.frame_info.time_epoch,
@@ -128,15 +130,19 @@ async def parse_pcap(pcap_file):
                 'length': packet['udp'].length.value,
             })
         if 'DTLS' in packet and 'handshake' not in packet['dtls'].field_names:
-            dtls_data.append({
-                'time': packet.frame_info.time_epoch,
-                'src': packet['ip'].src.value,
-                'dst': packet['ip'].dst.value,
-                'src_port': packet['udp'].srcport.value,
-                'dst_port': packet['udp'].dstport.value,
-                'length': packet['dtls'].record.length.value,
-                'seq': packet['dtls'].record.sequence.number.value,
-            })
+            try:
+                dtls_data.append({
+                    'time': packet.frame_info.time_epoch,
+                    'src': packet['ip'].src.value,
+                    'dst': packet['ip'].dst.value,
+                    'src_port': packet['udp'].srcport.value,
+                    'dst_port': packet['udp'].dstport.value,
+                    'length': packet['dtls'].record.length.value,
+                    'seq': packet['dtls'].record.sequence.number.value,
+                })
+            except AttributeError as e:
+                print(f'failed to add DTLS packet: {e}')
+                return
 
     pcap = pyshark.FileCapture(pcap_file, include_raw=True, use_ek=True)
     await pcap.packets_from_tshark(append_pkt)
