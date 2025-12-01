@@ -38,7 +38,7 @@ def _name_space_to_ip(namespace):
         case "ns4":
             return '10.3.0.20'
     raise ValueError(
-        f'dlts plotting only works for the namespaces ns1 and ns4, and not for {namespace}')
+        f'dtls plotting only works for the namespaces ns1 and ns4, and not for {namespace}')
 
 
 def _get_ips_from_config(config_df):
@@ -291,39 +291,39 @@ def plot_rtp_owd_pcap(ax, start_time, rtp_tx_df, rtp_rx_df):
     return _plot_owd(ax, start_time, rtp_tx_latency_df, rtp_rx_latency_df, 'extseq')
 
 
-def plot_dlts_owd(ax, start_time, dlts_tx_df, dlts_rx_df, config_df):
+def plot_dtls_owd(ax, start_time, dtls_tx_df, dtls_rx_df, config_df):
     sender_ip, receiver_ip = _get_ips_from_config(config_df)
 
-    dlts_tx_latency_df = dlts_tx_df[dlts_tx_df['src'] == sender_ip].copy()
-    dlts_rx_latency_df = dlts_rx_df[dlts_rx_df['dst'] == receiver_ip].copy()
-    dlts_tx_latency_df['ts'] = dlts_tx_latency_df.index
-    dlts_rx_latency_df['ts'] = dlts_rx_latency_df.index
+    dtls_tx_latency_df = dtls_tx_df[dtls_tx_df['src'] == sender_ip].copy()
+    dtls_rx_latency_df = dtls_rx_df[dtls_rx_df['dst'] == receiver_ip].copy()
+    dtls_tx_latency_df['ts'] = dtls_tx_latency_df.index
+    dtls_rx_latency_df['ts'] = dtls_rx_latency_df.index
 
-    return _plot_owd(ax, start_time, dlts_tx_latency_df, dlts_rx_latency_df, 'seq')
+    return _plot_owd(ax, start_time, dtls_tx_latency_df, dtls_rx_latency_df, 'seq')
 
 
-def plot_dlts_loss(ax, start_time, dlts_tx_df, dlts_rx_df, config_df):
+def plot_dtls_loss(ax, start_time, dtls_tx_df, dtls_rx_df, config_df):
     sender_ip, receiver_ip = _get_ips_from_config(config_df)
 
-    dlts_tx_latency_df = dlts_tx_df[dlts_tx_df['src'] == sender_ip].copy()
-    dlts_rx_latency_df = dlts_rx_df[dlts_rx_df['dst'] == receiver_ip].copy()
+    dtls_tx_latency_df = dtls_tx_df[dtls_tx_df['src'] == sender_ip].copy()
+    dtls_rx_latency_df = dtls_rx_df[dtls_rx_df['dst'] == receiver_ip].copy()
 
-    return _plot_rtp_loss(ax, start_time, dlts_tx_latency_df, dlts_rx_latency_df, 'seq')
+    return _plot_rtp_loss(ax, start_time, dtls_tx_latency_df, dtls_rx_latency_df, 'seq')
 
 
-def plot_dlts_rates(ax, start_time, cap_df, tx_df, dlts_tx_df, dlts_rx_df, config_df):
+def plot_dtls_rates(ax, start_time, cap_df, tx_df, dtls_tx_df, dtls_rx_df, config_df):
     plot_capacity(ax, start_time, cap_df)
     plot_target_rate(ax, start_time, tx_df)
 
     sender_ip, receiver_ip = _get_ips_from_config(config_df)
 
-    dlts_tx_df = dlts_tx_df[dlts_tx_df['src'] == sender_ip].copy()
-    dlts_tx_df['rate'] = dlts_tx_df['length'] * 80
-    _plot_rate(ax, start_time, dlts_tx_df, 'tx')
+    dtls_tx_df = dtls_tx_df[dtls_tx_df['src'] == sender_ip].copy()
+    dtls_tx_df['rate'] = dtls_tx_df['length'] * 80
+    _plot_rate(ax, start_time, dtls_tx_df, 'tx')
 
-    dlts_rx_df = dlts_rx_df[dlts_rx_df['dst'] == receiver_ip].copy()
-    dlts_rx_df['rate'] = dlts_rx_df['length'] * 80
-    _plot_rate(ax, start_time, dlts_rx_df, 'rx')
+    dtls_rx_df = dtls_rx_df[dtls_rx_df['dst'] == receiver_ip].copy()
+    dtls_rx_df['rate'] = dtls_rx_df['length'] * 80
+    _plot_rate(ax, start_time, dtls_rx_df, 'rx')
 
     _rate_plot_ax_config(ax)
     return True

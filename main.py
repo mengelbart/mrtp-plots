@@ -53,11 +53,11 @@ plots = [
      'receiver.feather'], 'quic_owd.png'),
 
     # DTLS
-    ('DLTS OWD (pcap)', plotters.plot_dlts_owd, ['ns4.dtls.feather',
+    ('DTLS OWD (pcap)', plotters.plot_dtls_owd, ['ns4.dtls.feather',
      'ns1.dtls.feather', 'config.feather'], 'dtls_owd.png'),
-    ('DLTS loss (pcap)', plotters.plot_dlts_loss, ['ns4.dtls.feather',
+    ('DTLS loss (pcap)', plotters.plot_dtls_loss, ['ns4.dtls.feather',
      'ns1.dtls.feather', 'config.feather'], 'dtls_loss.png'),
-    ('DLTS rate (pcap)', plotters.plot_dlts_rates, [
+    ('DTLS rate (pcap)', plotters.plot_dtls_rates, [
         'tc.feather', 'sender.stderr.feather', 'ns4.dtls.feather', 'ns1.dtls.feather',
         'config.feather'], 'dtls_rate.png'),
 
