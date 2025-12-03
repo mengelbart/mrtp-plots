@@ -417,6 +417,11 @@ def plot_rtp_owd_log_roq(ax, start_time, rtp_tx_df, rtp_rx_df, quic_tx_df):
     tx_mapping['extseq'] = tx_mapping['unwrapped-sequence-number'].astype(
         'int64')
 
+    rtp_tx_log = rtp_tx_df[rtp_tx_df['msg'] == 'rtp packet'].copy()
+    rtp_tx_log['ts'] = rtp_tx_log['time']
+    rtp_tx_log['extseq'] = rtp_tx_log['rtp-packet.sequence-number'].astype(
+        'int64')
+
     rx_mapping = rtp_rx_df[rtp_rx_df['msg'] == 'rtp to pts mapping'].copy()
     rx_mapping['ts'] = rx_mapping['time']
     rx_mapping['extseq'] = rx_mapping['unwrapped-sequence-number'].astype(
@@ -427,24 +432,32 @@ def plot_rtp_owd_log_roq(ax, start_time, rtp_tx_df, rtp_rx_df, quic_tx_df):
     rtp_rx_log['extseq'] = rtp_rx_log['rtp-packet.sequence-number'].astype(
         'int64')
 
-    quic_stack_network = _merge_owd(start_time, tx_mapping,
-                                    rx_mapping, 'extseq')
+    quic_stack_network = _merge_owd(start_time, rtp_tx_log,
+                                    rtp_rx_log, 'extseq')
     quic_stack_network['net_quic_delay'] = quic_stack_network['latency']
 
     recv_stack_delay = _merge_owd(start_time, rtp_rx_log, rx_mapping,
                                   'extseq')
     recv_stack_delay['recv_stack_delay'] = recv_stack_delay['latency']
 
+    send_stack_delay = _merge_owd(start_time, tx_mapping,
+                                  rtp_tx_log, 'extseq')
+    send_stack_delay['send_stack_delay'] = send_stack_delay['latency']
+
+    send_stack_delay = send_stack_delay.reset_index().set_index('extseq')
     recv_stack_delay = recv_stack_delay.reset_index().set_index('extseq')
     quic_stack_network = quic_stack_network.reset_index().set_index('extseq')
 
     combined_df = quic_stack_network.join(
         recv_stack_delay, how='inner', lsuffix='', rsuffix='_recv')
+    combined_df = combined_df.join(
+        send_stack_delay, how='inner', lsuffix='_send', rsuffix='')
 
     ax.stackplot(combined_df['second'],
+                 combined_df['send_stack_delay'],
                  combined_df['net_quic_delay'],
                  combined_df['recv_stack_delay'],
-                 labels=['quic stack + network', 'recv stack'],
+                 labels=['send stack', 'quic stack + network', 'recv stack'],
                  alpha=0.7)
 
     ax.legend()
