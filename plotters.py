@@ -237,6 +237,8 @@ def plot_rtp_loss_log(ax, start_time, rtp_tx_df, rtp_rx_df):
     """rtp loss without jitter buffer"""
     rtp_tx_df = rtp_tx_df[rtp_tx_df['msg'] == 'rtp packet'].copy()
     rtp_rx_df = rtp_rx_df[rtp_rx_df['msg'] == 'rtp packet'].copy()
+    if rtp_tx_df.empty:
+        return False
 
     return _plot_rtp_loss(ax, start_time, rtp_tx_df, rtp_rx_df, 'rtp-packet.sequence-number')
 
@@ -245,6 +247,8 @@ def plot_rtp_full_loss_log(ax, start_time, rtp_tx_df, rtp_rx_df):
     """rtp loss with jitter buffer"""
     rtp_tx_df = rtp_tx_df[rtp_tx_df['msg'] == 'rtp to pts mapping'].copy()
     rtp_rx_df = rtp_rx_df[rtp_rx_df['msg'] == 'rtp to pts mapping'].copy()
+    if rtp_tx_df.empty:
+        return False
 
     return _plot_rtp_loss(ax, start_time, rtp_tx_df, rtp_rx_df, 'unwrapped-sequence-number')
 
@@ -346,8 +350,12 @@ def plot_qloq_owd(ax, start_time, qlog_tx_df, qlog_rx_df):
 def plot_rtp_owd_log_udp(ax, start_time, rtp_tx_df, rtp_rx_df, pcap_tx_df, pcap_rx_df, config_df):
     """ for upp and webrtc transport"""
 
-    # tx: mapping-log <-> pcap -> sender stack delay
     tx_mapping = rtp_tx_df[rtp_tx_df['msg'] == 'rtp to pts mapping'].copy()
+    rx_mapping = rtp_rx_df[rtp_rx_df['msg'] == 'rtp to pts mapping'].copy()
+    if tx_mapping.empty or rx_mapping.empty:
+        return False
+
+    # tx: mapping-log <-> pcap -> sender stack delay
     tx_mapping['ts'] = tx_mapping['time']
     tx_mapping['extseq'] = tx_mapping['unwrapped-sequence-number'].astype(
         'int64')
@@ -363,7 +371,6 @@ def plot_rtp_owd_log_udp(ax, start_time, rtp_tx_df, rtp_rx_df, pcap_tx_df, pcap_
     send_stack_delay['send_stack_delay'] = send_stack_delay['latency']
 
     # rx: pcap <-> mapping-log -> receiver stack delay
-    rx_mapping = rtp_rx_df[rtp_rx_df['msg'] == 'rtp to pts mapping'].copy()
     rx_mapping['ts'] = rx_mapping['time']
     rx_mapping['extseq'] = rx_mapping['unwrapped-sequence-number'].astype(
         'int64')
@@ -411,23 +418,25 @@ def plot_rtp_owd_log_roq(ax, start_time, rtp_tx_df, rtp_rx_df, quic_tx_df):
     """ for roq transport. quic_tx_df not used but makes sure it is only called for roq transport"""
 
     tx_mapping = rtp_tx_df[rtp_tx_df['msg'] == 'rtp to pts mapping'].copy()
-    if tx_mapping.empty:
+    rtp_tx_log = rtp_tx_df[rtp_tx_df['msg'] == 'rtp packet'].copy()
+    rtp_rx_log = rtp_rx_df[rtp_rx_df['msg'] == 'rtp packet'].copy()
+    rx_mapping = rtp_rx_df[rtp_rx_df['msg'] == 'rtp to pts mapping'].copy()
+
+    if tx_mapping.empty or rtp_tx_log.empty or rtp_rx_log.empty or rx_mapping.empty:
         return False
+
     tx_mapping['ts'] = tx_mapping['time']
     tx_mapping['extseq'] = tx_mapping['unwrapped-sequence-number'].astype(
         'int64')
 
-    rtp_tx_log = rtp_tx_df[rtp_tx_df['msg'] == 'rtp packet'].copy()
     rtp_tx_log['ts'] = rtp_tx_log['time']
     rtp_tx_log['extseq'] = rtp_tx_log['rtp-packet.sequence-number'].astype(
         'int64')
 
-    rx_mapping = rtp_rx_df[rtp_rx_df['msg'] == 'rtp to pts mapping'].copy()
     rx_mapping['ts'] = rx_mapping['time']
     rx_mapping['extseq'] = rx_mapping['unwrapped-sequence-number'].astype(
         'int64')
 
-    rtp_rx_log = rtp_rx_df[rtp_rx_df['msg'] == 'rtp packet'].copy()
     rtp_rx_log['ts'] = rtp_rx_log['time']
     rtp_rx_log['extseq'] = rtp_rx_log['rtp-packet.sequence-number'].astype(
         'int64')
