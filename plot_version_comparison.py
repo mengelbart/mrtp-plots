@@ -75,7 +75,7 @@ def plot_delay(testtype, cases, out):
             qlog_tx_df = serializers.read_feather(qlog_tx_feather)
             qlog_rx_df = serializers.read_feather(qlog_rx_feater)
 
-            plotted = plotters.plot_qloq_owd(
+            plotted = plotters.plot_qlog_owd(
                 ax, start_time, qlog_tx_df, qlog_rx_df
             )
 
