@@ -333,7 +333,7 @@ def plot_dtls_rates(ax, start_time, cap_df, tx_df, dtls_tx_df, dtls_rx_df, confi
     return True
 
 
-def plot_qloq_owd(ax, start_time, qlog_tx_df, qlog_rx_df):
+def plot_qlog_owd(ax, start_time, qlog_tx_df, qlog_rx_df):
     quic_tx_latency_df = qlog_tx_df[qlog_tx_df['name']
                                     == 'transport:packet_sent'].copy()
     quic_rx_latency_df = qlog_rx_df[qlog_rx_df['name']
