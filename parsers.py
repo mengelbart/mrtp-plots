@@ -76,8 +76,7 @@ def parse_qlog(log_file):
 
     df = pd.json_normalize(data)
 
-    # TODO: use more sophisticated filtering to filter handshake packets out
-    df = df[df['data.header.packet_number'] >= 2]
+    df = df[df['data.header.packet_type'] == '1RTT']
 
     # add reference time to all relative timestamps
     df["time"] = pd.to_timedelta(df["time"], unit="ms") + reference_time
