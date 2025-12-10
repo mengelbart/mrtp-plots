@@ -67,10 +67,22 @@ def plot_rtp_rates_log(ax, start_time, cap_df, tx_df, rx_df):
     """ plots rtp rates from logs"""
     plot_capacity(ax, start_time, cap_df)
     plot_target_rate(ax, start_time, tx_df)
-    plot_rtp_rate(ax, start_time, tx_df, 'tx')
-    plot_rtp_rate(ax, start_time, rx_df, 'rx')
+    plot_rtp_rate_logging(ax, start_time, tx_df, 'tx')
+    plot_rtp_rate_logging(ax, start_time, rx_df, 'rx')
     _rate_plot_ax_config(ax)
     return True
+
+
+def _plot_rtp_send_rate_pcaps(ax, start_time, sender_ip, rtp_tx_df, name='tx'):
+    rtp_tx_df = rtp_tx_df[rtp_tx_df['src'] == sender_ip].copy()
+    rtp_tx_df['rate'] = rtp_tx_df['length'] * 80
+    return _plot_rate(ax, start_time, rtp_tx_df, name)
+
+
+def _plot_rtp_recv_rate_pcaps(ax, start_time, receiver_ip, rtp_rx_df, name='rx'):
+    rtp_rx_df = rtp_rx_df[rtp_rx_df['dst'] == receiver_ip].copy()
+    rtp_rx_df['rate'] = rtp_rx_df['length'] * 80
+    return _plot_rate(ax, start_time, rtp_rx_df, name)
 
 
 def plot_rtp_rates_pcaps(ax, start_time, cap_df, tx_log_df, rtp_tx_df, rtp_rx_df, config_df):
@@ -79,14 +91,8 @@ def plot_rtp_rates_pcaps(ax, start_time, cap_df, tx_log_df, rtp_tx_df, rtp_rx_df
     plot_target_rate(ax, start_time, tx_log_df)
 
     sender_ip, receiver_ip = _get_ips_from_config(config_df)
-
-    rtp_tx_df = rtp_tx_df[rtp_tx_df['src'] == sender_ip].copy()
-    rtp_tx_df['rate'] = rtp_tx_df['length'] * 80
-    _plot_rate(ax, start_time, rtp_tx_df, 'tx')
-
-    rtp_rx_df = rtp_rx_df[rtp_rx_df['dst'] == receiver_ip].copy()
-    rtp_rx_df['rate'] = rtp_rx_df['length'] * 80
-    _plot_rate(ax, start_time, rtp_rx_df, 'rx')
+    _plot_rtp_send_rate_pcaps(ax, start_time, sender_ip, rtp_tx_df)
+    _plot_rtp_recv_rate_pcaps(ax, start_time, receiver_ip, rtp_rx_df)
 
     _rate_plot_ax_config(ax)
     return True
@@ -127,7 +133,7 @@ def plot_all_send_rates(ax, start_time, cap_df, tx_df):
     if not tx_data_plotted:
         return False
 
-    _, media_df = plot_rtp_rate(ax, start_time, tx_df, 'media')
+    _, media_df = plot_rtp_rate_logging(ax, start_time, tx_df, 'media')
 
     # sum graph
     combined_df = data_df.join(
@@ -152,7 +158,7 @@ def plot_all_recv_rates(ax, start_time, cap_df, tx_df, rx_df):
     if not rx_plotted:
         return False
 
-    _, media_df = plot_rtp_rate(ax, start_time, rx_df, 'media')
+    _, media_df = plot_rtp_rate_logging(ax, start_time, rx_df, 'media')
 
     # sum graph
     combined_df = data_df.join(
@@ -164,6 +170,120 @@ def plot_all_recv_rates(ax, start_time, cap_df, tx_df, rx_df):
 
     _rate_plot_ax_config(ax)
     return True
+
+
+def plot_all_send_rates_pcaps(ax, start_time, cap_df, tx_df, rtp_tx_df, dtls_tx_df, config_df):
+    plot_capacity(ax, start_time, cap_df)
+    plot_target_rate(
+        ax, start_time, tx_df, event_name='NEW_TARGET_RATE', label='tr all')
+    plot_target_rate(ax, start_time, tx_df, label='tr media')
+
+    sender_ip, _ = _get_ips_from_config(config_df)
+
+    _, data_df = _plot_dlts_send_rate(
+        ax, start_time, sender_ip, dtls_tx_df, name='data')
+    _, media_df = _plot_rtp_send_rate_pcaps(
+        ax, start_time, sender_ip, rtp_tx_df, name='media')
+
+    # sum graph
+    combined_df = data_df.join(
+        media_df, how='outer', lsuffix='_data', rsuffix='_media')
+    combined_df['rate'] = combined_df.get(
+        'rate_data', 0) + combined_df.get('rate_media', 0)
+    ax.plot(combined_df.index,
+            combined_df['rate'], label='total', linewidth=0.5)
+
+    _rate_plot_ax_config(ax)
+    return True
+
+
+def plot_all_recv_rates_pcaps(ax, start_time, cap_df, tx_df, rtp_rx_df, dtls_rx_df, config_df):
+    plot_capacity(ax, start_time, cap_df)
+    plot_target_rate(
+        ax, start_time, tx_df, event_name='NEW_TARGET_RATE')
+
+    _, receiver_ip = _get_ips_from_config(config_df)
+
+    _, data_df = _plot_dlts_recv_rate(
+        ax, start_time, receiver_ip, dtls_rx_df, name='data')
+    _, media_df = _plot_rtp_recv_rate_pcaps(
+        ax, start_time, receiver_ip, rtp_rx_df, name='media')
+
+    # sum graph
+    combined_df = data_df.join(
+        media_df, how='outer', lsuffix='_data', rsuffix='_media')
+    combined_df['rate'] = combined_df.get(
+        'rate_data', 0) + combined_df.get('rate_media', 0)
+    ax.plot(combined_df.index,
+            combined_df['rate'], label='total', linewidth=0.5)
+
+    _rate_plot_ax_config(ax)
+    return True
+
+
+def _plot_all_qlog_rates(ax, start_time, cap_df, tx_df, rx_df, quic_df):
+    plot_capacity(ax, start_time, cap_df)
+    plot_target_rate(
+        ax, start_time, tx_df, event_name='NEW_TARGET_RATE', label='tr all')
+    plot_target_rate(ax, start_time, tx_df, label='tr media')
+
+    # get frames
+    frames_df = quic_df.explode('data.frames')
+    frames_normalized = pd.json_normalize(frames_df['data.frames'], sep='.')
+    frames_normalized.index = frames_df.index
+    qlog_frames = pd.concat(
+        [frames_df.drop('data.frames', axis=1), frames_normalized], axis=1)
+
+    stream_mapping = rx_df[rx_df['msg'] == 'new uni stream']
+    if stream_mapping.empty:
+        return False
+
+    # TODO
+    rtp_streams_mapping = stream_mapping[stream_mapping['flowID'] == 0]
+    data_streams_mapping = stream_mapping[stream_mapping['flowID'] == 3]
+
+    if data_streams_mapping.empty or rtp_streams_mapping.empty:
+        return False
+
+    data_tx = qlog_frames.merge(
+        data_streams_mapping, left_on='stream_id', right_on='streamID', suffixes=['', '_mapping'])
+
+    # length is length field of the frame
+    data_tx['rate'] = data_tx['length'] * 80
+
+    _, data_df = _plot_data_rate(ax, start_time, data_tx, 'data')
+
+    rtp_tx = qlog_frames.merge(
+        rtp_streams_mapping, left_on='stream_id', right_on='streamID', suffixes=['', '_mapping'])
+    rtp_tx['rate'] = rtp_tx['length'] * 80
+    _, media_df = _plot_data_rate(ax, start_time, rtp_tx, 'media')
+
+    # sum graph
+    combined_df = data_df.join(
+        media_df, how='outer', lsuffix='_data', rsuffix='_media')
+    combined_df['rate'] = combined_df.get(
+        'rate_data', 0) + combined_df.get('rate_media', 0)
+    ax.plot(combined_df.index,
+            combined_df['rate'], label='total', linewidth=0.5)
+
+    _rate_plot_ax_config(ax)
+    return True
+
+
+def plot_all_send_rates_qlog(ax, start_time, cap_df, tx_df, rx_df, qlog_tx_df):
+    quic_tx_df = qlog_tx_df[qlog_tx_df['name']
+                            == 'transport:packet_sent'].copy()
+    if quic_tx_df.empty:
+        return False
+    return _plot_all_qlog_rates(ax, start_time, cap_df, tx_df, rx_df, quic_tx_df)
+
+
+def plot_all_recv_rates_qlog(ax, start_time, cap_df, tx_df, rx_df, qlog_rx_df):
+    qlog_rx_df = qlog_rx_df[qlog_rx_df['name']
+                            == 'transport:packet_received'].copy()
+    if qlog_rx_df.empty:
+        return False
+    return _plot_all_qlog_rates(ax, start_time, cap_df, tx_df, rx_df, qlog_rx_df)
 
 
 def _rate_plot_ax_config(ax):
@@ -193,7 +313,7 @@ def plot_target_rate(ax, start_time, df, event_name='NEW_TARGET_MEDIA_RATE', lab
     return True
 
 
-def plot_rtp_rate(ax, start_time, df, label):
+def plot_rtp_rate_logging(ax, start_time, df, label):
     df = df[df['msg'] == 'rtp packet'].copy()
     if df.empty:
         return False, df
@@ -315,19 +435,26 @@ def plot_dtls_loss(ax, start_time, dtls_tx_df, dtls_rx_df, config_df):
     return _plot_rtp_loss(ax, start_time, dtls_tx_latency_df, dtls_rx_latency_df, 'seq')
 
 
+def _plot_dlts_send_rate(ax, start_time, sender_ip, dtls_tx_df, name='tx'):
+    dtls_tx_df = dtls_tx_df[dtls_tx_df['src'] == sender_ip].copy()
+    dtls_tx_df['rate'] = dtls_tx_df['length'] * 80
+    return _plot_rate(ax, start_time, dtls_tx_df, name)
+
+
+def _plot_dlts_recv_rate(ax, start_time, receiver_ip, dtls_rx_df, name='rx'):
+    dtls_rx_df = dtls_rx_df[dtls_rx_df['dst'] == receiver_ip].copy()
+    dtls_rx_df['rate'] = dtls_rx_df['length'] * 80
+    return _plot_rate(ax, start_time, dtls_rx_df, name)
+
+
 def plot_dtls_rates(ax, start_time, cap_df, tx_df, dtls_tx_df, dtls_rx_df, config_df):
     plot_capacity(ax, start_time, cap_df)
     plot_target_rate(ax, start_time, tx_df)
 
     sender_ip, receiver_ip = _get_ips_from_config(config_df)
 
-    dtls_tx_df = dtls_tx_df[dtls_tx_df['src'] == sender_ip].copy()
-    dtls_tx_df['rate'] = dtls_tx_df['length'] * 80
-    _plot_rate(ax, start_time, dtls_tx_df, 'tx')
-
-    dtls_rx_df = dtls_rx_df[dtls_rx_df['dst'] == receiver_ip].copy()
-    dtls_rx_df['rate'] = dtls_rx_df['length'] * 80
-    _plot_rate(ax, start_time, dtls_rx_df, 'rx')
+    _plot_dlts_send_rate(ax, start_time, sender_ip, dtls_tx_df)
+    _plot_dlts_recv_rate(ax, start_time, receiver_ip, dtls_rx_df)
 
     _rate_plot_ax_config(ax)
     return True
