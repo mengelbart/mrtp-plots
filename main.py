@@ -33,6 +33,14 @@ plots = [
      'tc.feather', 'sender.stderr.feather'], 'all_send_rates.png'),
     ('Receive Rates (logging)', plotters.plot_all_recv_rates, [
      'tc.feather', 'sender.stderr.feather', 'receiver.stderr.feather'], 'all_recv_rates.png'),
+    ('Send Rates (pcap)', plotters.plot_all_send_rates_pcaps, [
+     'tc.feather', 'sender.stderr.feather', 'ns4.rtp.feather', 'ns4.dtls.feather', 'config.feather'], 'all_send_rates_pcaps.png'),
+    ('Receive Rates (pcap)', plotters.plot_all_recv_rates_pcaps, [
+     'tc.feather', 'sender.stderr.feather', 'ns1.rtp.feather', 'ns1.dtls.feather', 'config.feather'], 'all_recv_rates_pcaps.png'),
+    ('Send Rates (qlog)', plotters.plot_all_send_rates_qlog, [
+     'tc.feather', 'sender.stderr.feather', 'receiver.stderr.feather', 'sender.feather'], 'all_send_rates_qlog.png'),
+    ('Receive Rates (qlog)', plotters.plot_all_recv_rates_qlog, [
+     'tc.feather', 'sender.stderr.feather', 'receiver.stderr.feather', 'receiver.feather'], 'all_recv_rates_qlog.png'),
 
     # loss
     ('RTP Network Loss Rate (pcap)', plotters.plot_rtp_loss_pcap, ['ns4.rtp.feather',

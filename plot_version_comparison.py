@@ -101,7 +101,7 @@ def plot_send_rate(testtype, cases, out):
         feather_file = Path(case[1]) / Path("sender.stderr.feather")
         if feather_file.is_file():
             df = serializers.read_feather(feather_file)
-            plotted = plotters.plot_rtp_rate(ax, start_time, df, case[2])
+            plotted = plotters.plot_rtp_rate_logging(ax, start_time, df, case[2])
             if plotted:
                 legend.append(case[2] + " rtp")
                 continue
