@@ -122,6 +122,15 @@ def plot_quic_rates(ax, start_time, cap_df, tx_log_df, qlog_tx_df, qlog_rx_df):
     return True
 
 
+def _plot_data_media_sum_rate(ax, data_df, media_df):
+    combined_df = data_df.join(
+        media_df, how='outer', lsuffix='_data', rsuffix='_media')
+    combined_df['rate'] = combined_df.get(
+        'rate_data', 0) + combined_df.get('rate_media', 0)
+    ax.plot(combined_df.index,
+            combined_df['rate'], label='total', linewidth=0.5)
+
+
 def plot_all_send_rates(ax, start_time, cap_df, tx_df):
     plot_capacity(ax, start_time, cap_df)
     plot_target_rate(
@@ -134,15 +143,7 @@ def plot_all_send_rates(ax, start_time, cap_df, tx_df):
         return False
 
     _, media_df = plot_rtp_rate_logging(ax, start_time, tx_df, 'media')
-
-    # sum graph
-    combined_df = data_df.join(
-        media_df, how='outer', lsuffix='_data', rsuffix='_media')
-    combined_df['rate'] = combined_df.get(
-        'rate_data', 0) + combined_df.get('rate_media', 0)
-    ax.plot(combined_df.index,
-            combined_df['rate'], label='total', linewidth=0.5)
-
+    _plot_data_media_sum_rate(ax, data_df, media_df)
     _rate_plot_ax_config(ax)
     return True
 
@@ -159,15 +160,7 @@ def plot_all_recv_rates(ax, start_time, cap_df, tx_df, rx_df):
         return False
 
     _, media_df = plot_rtp_rate_logging(ax, start_time, rx_df, 'media')
-
-    # sum graph
-    combined_df = data_df.join(
-        media_df, how='outer', lsuffix='_data', rsuffix='_media')
-    combined_df['rate'] = combined_df.get(
-        'rate_data', 0) + combined_df.get('rate_media', 0)
-    ax.plot(combined_df.index,
-            combined_df['rate'], label='total', linewidth=0.5)
-
+    _plot_data_media_sum_rate(ax, data_df, media_df)
     _rate_plot_ax_config(ax)
     return True
 
@@ -185,14 +178,7 @@ def plot_all_send_rates_pcaps(ax, start_time, cap_df, tx_df, rtp_tx_df, dtls_tx_
     _, media_df = _plot_rtp_send_rate_pcaps(
         ax, start_time, sender_ip, rtp_tx_df, name='media')
 
-    # sum graph
-    combined_df = data_df.join(
-        media_df, how='outer', lsuffix='_data', rsuffix='_media')
-    combined_df['rate'] = combined_df.get(
-        'rate_data', 0) + combined_df.get('rate_media', 0)
-    ax.plot(combined_df.index,
-            combined_df['rate'], label='total', linewidth=0.5)
-
+    _plot_data_media_sum_rate(ax, data_df, media_df)
     _rate_plot_ax_config(ax)
     return True
 
@@ -209,14 +195,7 @@ def plot_all_recv_rates_pcaps(ax, start_time, cap_df, tx_df, rtp_rx_df, dtls_rx_
     _, media_df = _plot_rtp_recv_rate_pcaps(
         ax, start_time, receiver_ip, rtp_rx_df, name='media')
 
-    # sum graph
-    combined_df = data_df.join(
-        media_df, how='outer', lsuffix='_data', rsuffix='_media')
-    combined_df['rate'] = combined_df.get(
-        'rate_data', 0) + combined_df.get('rate_media', 0)
-    ax.plot(combined_df.index,
-            combined_df['rate'], label='total', linewidth=0.5)
-
+    _plot_data_media_sum_rate(ax, data_df, media_df)
     _rate_plot_ax_config(ax)
     return True
 
@@ -258,13 +237,7 @@ def _plot_all_qlog_rates(ax, start_time, cap_df, tx_df, rx_df, quic_df):
     rtp_tx['rate'] = rtp_tx['length'] * 80
     _, media_df = _plot_data_rate(ax, start_time, rtp_tx, 'media')
 
-    # sum graph
-    combined_df = data_df.join(
-        media_df, how='outer', lsuffix='_data', rsuffix='_media')
-    combined_df['rate'] = combined_df.get(
-        'rate_data', 0) + combined_df.get('rate_media', 0)
-    ax.plot(combined_df.index,
-            combined_df['rate'], label='total', linewidth=0.5)
+    _plot_data_media_sum_rate(ax, data_df, media_df)
 
     _rate_plot_ax_config(ax)
     return True
@@ -317,9 +290,7 @@ def plot_rtp_rate_logging(ax, start_time, df, label):
     df = df[df['msg'] == 'rtp packet'].copy()
     if df.empty:
         return False, df
-
     df['rate'] = df['rtp-packet.payload-length'] * 80
-
     return _plot_data_rate(ax, start_time, df, label)
 
 
@@ -327,9 +298,7 @@ def plot_data_rate(ax, start_time, df, label, event_name='DataSource sent data')
     df = df[df['msg'] == event_name].copy()
     if df.empty:
         return False, df
-
     df['rate'] = df['payload-length'] * 80
-
     return _plot_data_rate(ax, start_time, df, label)
 
 
