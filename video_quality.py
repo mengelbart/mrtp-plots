@@ -10,6 +10,10 @@ import parsers
 def map_frames_sender_pipeline(tx_df):
     tx_before_enc = tx_df[tx_df['msg'] == 'encoder sink'].copy()
 
+    flow_ids = tx_before_enc['flow-id'].unique()
+    if len(flow_ids) > 1:
+        raise ValueError("Frame latency only supported for single RTP flow")
+
     tx_mapping = tx_df[tx_df['msg'] == 'rtp to pts mapping'].copy()
     tx_frames = tx_df[tx_df['msg'] == 'encoder src'].copy()
 

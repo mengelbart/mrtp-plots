@@ -123,6 +123,11 @@ def plot_quic_rates(ax, start_time, cap_df, tx_log_df, qlog_tx_df, qlog_rx_df):
 
 
 def _plot_data_media_sum_rate(ax, data_df, media_df):
+    if data_df.empty:
+        ax.plot(media_df.index,
+                media_df['rate'], label='total', linewidth=0.5)
+        return
+
     combined_df = data_df.join(
         media_df, how='outer', lsuffix='_data', rsuffix='_media')
     combined_df['rate'] = combined_df.get(
@@ -215,29 +220,46 @@ def _plot_all_qlog_rates(ax, start_time, cap_df, tx_df, rx_df, quic_df):
 
     stream_mapping = rx_df[rx_df['msg'] == 'new uni stream']
     if stream_mapping.empty:
+        print(">>>>> stream mapping empty")
         return False
 
-    # TODO
-    rtp_streams_mapping = stream_mapping[stream_mapping['flowID'] == 0]
     data_streams_mapping = stream_mapping[stream_mapping['flowID'] == 3]
 
-    if data_streams_mapping.empty or rtp_streams_mapping.empty:
+    data_df = pd.DataFrame()
+    if not data_streams_mapping.empty:
+        data_tx = qlog_frames.merge(
+            data_streams_mapping, left_on='stream_id', right_on='streamID', suffixes=['', '_mapping'])
+
+        # length is length field of the frame
+        data_tx['rate'] = data_tx['length'] * 80
+
+        _, data_df = _plot_data_rate(ax, start_time, data_tx, 'data')
+
+    # plot each RTP flow separately
+    flow_ids = {0, 10, 20}
+    rtp_streams_mapping = stream_mapping[stream_mapping['flowID'].isin(
+        flow_ids)]
+
+    if rtp_streams_mapping.empty:
         return False
 
-    data_tx = qlog_frames.merge(
-        data_streams_mapping, left_on='stream_id', right_on='streamID', suffixes=['', '_mapping'])
+    media_dfs = []
+    for flow_id in sorted(rtp_streams_mapping['flowID'].unique()):
+        flow_mapping = rtp_streams_mapping[rtp_streams_mapping['flowID'] == flow_id]
+        rtp_tx = qlog_frames.merge(
+            flow_mapping, left_on='stream_id', right_on='streamID', suffixes=['', '_mapping'])
+        rtp_tx['rate'] = rtp_tx['length'] * 80
+        plotted, media_df = _plot_data_rate(
+            ax, start_time, rtp_tx, f'media flow {int(flow_id)}')
+        if plotted:
+            media_dfs.append(media_df)
 
-    # length is length field of the frame
-    data_tx['rate'] = data_tx['length'] * 80
+    if not media_dfs:
+        return False
 
-    _, data_df = _plot_data_rate(ax, start_time, data_tx, 'data')
-
-    rtp_tx = qlog_frames.merge(
-        rtp_streams_mapping, left_on='stream_id', right_on='streamID', suffixes=['', '_mapping'])
-    rtp_tx['rate'] = rtp_tx['length'] * 80
-    _, media_df = _plot_data_rate(ax, start_time, rtp_tx, 'media')
-
-    _plot_data_media_sum_rate(ax, data_df, media_df)
+    # sum media rates across all RTP flows
+    media_sum_df = pd.concat(media_dfs).groupby(level=0).sum(numeric_only=True)
+    _plot_data_media_sum_rate(ax, data_df, media_sum_df)
 
     _rate_plot_ax_config(ax)
     return True
@@ -514,6 +536,10 @@ def plot_rtp_owd_log_roq(ax, start_time, rtp_tx_df, rtp_rx_df, quic_tx_df):
     """ for roq transport. quic_tx_df not used but makes sure it is only called for roq transport"""
 
     tx_mapping = rtp_tx_df[rtp_tx_df['msg'] == 'rtp to pts mapping'].copy()
+    flow_ids = tx_mapping['flow-id'].unique()
+    if len(flow_ids) > 1:
+        return False
+
     rtp_tx_log = rtp_tx_df[rtp_tx_df['msg'] == 'rtp packet'].copy()
     rtp_rx_log = rtp_rx_df[rtp_rx_df['msg'] == 'rtp packet'].copy()
     rx_mapping = rtp_rx_df[rtp_rx_df['msg'] == 'rtp to pts mapping'].copy()
@@ -815,7 +841,7 @@ def plot_frame_latency(ax, start_time, tx_df, rx_df):
     try:
         tx_merged = video_quality.map_frames_sender_pipeline(tx_df)
         rx_merged = video_quality.map_frames_receiver_pipeline(rx_df)
-    except KeyError:
+    except (KeyError, ValueError):
         return False
 
     merged_df = tx_merged.merge(
@@ -871,9 +897,19 @@ def plot_video_rate(ax, start_time, rx_df):
     if rx_data.empty:
         return False
 
-    rx_data['rate'] = rx_data['length'] * 80  # bits per second
+    flow_ids = sorted(rx_data['flow-id'].unique())
 
-    _plot_data_rate(ax, start_time, rx_data, 'video rate')
+    if len(flow_ids) == 1:
+        rx_data['rate'] = rx_data['length'] * 80
+        _plot_data_rate(ax, start_time, rx_data, 'video rate')
+    else:
+        # Plot each flow separately
+        for flow_id in flow_ids:
+            flow_data = rx_data[rx_data['flow-id'] == flow_id].copy()
+            flow_data['rate'] = flow_data['length'] * 80
+            _plot_data_rate(ax, start_time, flow_data,
+                            f'video rate flow {int(flow_id)}')
+
     _rate_plot_ax_config(ax)
     return True
 
