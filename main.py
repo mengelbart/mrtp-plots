@@ -17,96 +17,103 @@ import video_quality
 
 plots = [
     # RTP rates
-    # ('RTP Rates (logging)', plotters.plot_rtp_rates_log, [
+    # ('RTP Rates (logging)', plotters.plot_rtp_rates_log, 1,1, [
     #  'tc.feather', 'sender.stderr.feather', 'receiver.stderr.feather'], 'rtp_rates_logs.png'),
-    ('RTP Network Rates (pcaps)', plotters.plot_rtp_rates_pcaps, [
+    ('RTP Network Rates (pcaps)', plotters.plot_rtp_rates_pcaps, 1, 1, [
      'tc.feather', 'sender.stderr.feather', 'ns4.rtp.feather', 'ns1.rtp.feather', 'config.feather'], 'rtp_rates.png'),
-    ('QUIC Network Rates (qlog)', plotters.plot_quic_rates, [
+    ('QUIC Network Rates (qlog)', plotters.plot_quic_rates, 1, 1, [
      'tc.feather', 'sender.stderr.feather', 'sender.feather', 'receiver.feather'], 'quic_rates.png'),
-    # ('RTP Send Rate', plotters.plot_rtp_rate, [
+    # ('RTP Send Rate', plotters.plot_rtp_rate, 1,1, [
     #  'sender.stderr.feather'], 'rtp_send_rate.png'),
-    # ('RTP Recv Rate', plotters.plot_rtp_rate, [
+    # ('RTP Recv Rate', plotters.plot_rtp_rate, 1,1, [
     #  'receiver.stderr.feather'], 'rtp_recv_rate.png'),
 
     # combined rates
-    ('Send Rates (logging)', plotters.plot_all_send_rates, [
+    ('Send Rates (logging)', plotters.plot_all_send_rates, 1, 1, [
      'tc.feather', 'sender.stderr.feather'], 'all_send_rates.png'),
-    ('Receive Rates (logging)', plotters.plot_all_recv_rates, [
+    ('Receive Rates (logging)', plotters.plot_all_recv_rates, 1, 1, [
      'tc.feather', 'sender.stderr.feather', 'receiver.stderr.feather'], 'all_recv_rates.png'),
-    ('Send Rates (pcap)', plotters.plot_all_send_rates_pcaps, [
+    ('Send Rates (pcap)', plotters.plot_all_send_rates_pcaps, 1, 1, [
      'tc.feather', 'sender.stderr.feather', 'ns4.rtp.feather', 'ns4.dtls.feather', 'config.feather'], 'all_send_rates_pcaps.png'),
-    ('Receive Rates (pcap)', plotters.plot_all_recv_rates_pcaps, [
+    ('Receive Rates (pcap)', plotters.plot_all_recv_rates_pcaps, 1, 1, [
      'tc.feather', 'sender.stderr.feather', 'ns1.rtp.feather', 'ns1.dtls.feather', 'config.feather'], 'all_recv_rates_pcaps.png'),
-    ('Send Rates (qlog)', plotters.plot_all_send_rates_qlog, [
+    ('Send Rates (qlog)', plotters.plot_all_send_rates_qlog, 1, 1, [
      'tc.feather', 'sender.stderr.feather', 'receiver.stderr.feather', 'sender.feather'], 'all_send_rates_qlog.png'),
-    ('Receive Rates (qlog)', plotters.plot_all_recv_rates_qlog, [
+    ('Receive Rates (qlog)', plotters.plot_all_recv_rates_qlog, 1, 1, [
      'tc.feather', 'sender.stderr.feather', 'receiver.stderr.feather', 'receiver.feather'], 'all_recv_rates_qlog.png'),
 
     # loss
-    ('RTP Network Loss Rate (pcap)', plotters.plot_rtp_loss_pcap, ['ns4.rtp.feather',
+    ('RTP Network Loss Rate (pcap)', plotters.plot_rtp_loss_pcap, 1, 1, ['ns4.rtp.feather',
      'ns1.rtp.feather'], 'rtp_loss.png'),
-    ('RTP Loss Rate (network)', plotters.plot_rtp_loss_log, ['sender.stderr.feather',
+    ('RTP Loss Rate (network)', plotters.plot_rtp_loss_log, 1, 1, ['sender.stderr.feather',
      'receiver.stderr.feather'], 'rtp_loss_net.png'),
-    ('RTP Loss Rate (after jitter)', plotters.plot_rtp_full_loss_log, ['sender.stderr.feather',
+    ('RTP Loss Rate (after jitter)', plotters.plot_rtp_full_loss_log, 1, 1, ['sender.stderr.feather',
      'receiver.stderr.feather'], 'rtp_loss_full.png'),
 
     # OWD
-    ('Network OWD (RTP pcap)', plotters.plot_rtp_owd_pcap, ['ns4.rtp.feather',
+    ('Network OWD (RTP pcap)', plotters.plot_rtp_owd_pcap, 1, 1, ['ns4.rtp.feather',
      'ns1.rtp.feather'], 'rtp_owd.png'),
-    ('RTP OWD', plotters.plot_rtp_owd_log_udp, ['sender.stderr.feather',
+    ('RTP OWD', plotters.plot_rtp_owd_log_udp, 1, 1, ['sender.stderr.feather',
      'receiver.stderr.feather', 'ns4.rtp.feather', 'ns1.rtp.feather', 'config.feather'], 'rtp_owd_log.png'),
-    ('RTP OWD', plotters.plot_rtp_owd_log_roq, ['sender.stderr.feather',
+    ('RTP OWD', plotters.plot_rtp_owd_log_roq, 1, 1, ['sender.stderr.feather',
      'receiver.stderr.feather', 'sender.feather'], 'rtp_owd_quic.png'),
-    ('Network OWD (QUIC qlog)', plotters.plot_qlog_owd, ['sender.feather',
+    ('Network OWD (QUIC qlog)', plotters.plot_qlog_owd, 1, 1, ['sender.feather',
      'receiver.feather'], 'quic_owd.png'),
 
     # DTLS
-    ('DTLS OWD (pcap)', plotters.plot_dtls_owd, ['ns4.dtls.feather',
+    ('DTLS OWD (pcap)', plotters.plot_dtls_owd, 1, 1, ['ns4.dtls.feather',
      'ns1.dtls.feather', 'config.feather'], 'dtls_owd.png'),
-    ('DTLS loss (pcap)', plotters.plot_dtls_loss, ['ns4.dtls.feather',
+    ('DTLS loss (pcap)', plotters.plot_dtls_loss, 1, 1, ['ns4.dtls.feather',
      'ns1.dtls.feather', 'config.feather'], 'dtls_loss.png'),
-    ('DTLS rate (pcap)', plotters.plot_dtls_rates, [
+    ('DTLS rate (pcap)', plotters.plot_dtls_rates, 1, 1, [
         'tc.feather', 'sender.stderr.feather', 'ns4.dtls.feather', 'ns1.dtls.feather',
         'config.feather'], 'dtls_rate.png'),
 
     # CC stats
-    ('SCReAM Queue Delay', plotters.plot_scream_queue_delay,
+    ('SCReAM Queue Delay', plotters.plot_scream_queue_delay, 1, 1,
      ['sender.stderr.feather'], 'scream_queue_delay.png'),
-    ('SCReAM CWND', plotters.plot_scream_cwnd, [
+    ('SCReAM CWND', plotters.plot_scream_cwnd, 1, 1, [
      'sender.stderr.feather'], 'scream_cwnd.png'),
-    ('GCC RTT', plotters.plot_gcc_rtt, [
+    ('GCC RTT', plotters.plot_gcc_rtt, 1, 1, [
      'sender.stderr.feather'], 'gcc_rtt.png'),
-    ('GCC Target Rates', plotters.plot_gcc_target_rates, [
+    ('GCC Target Rates', plotters.plot_gcc_target_rates, 1, 1, [
         'sender.stderr.feather'], 'gcc_target_rates.png'),
-    ('GCC Estimates', plotters.plot_gcc_estimates, [
+    ('GCC Estimates', plotters.plot_gcc_estimates, 1, 1, [
      'sender.stderr.feather'], 'gcc_estimates.png'),
-    ('GCC Usage and State', plotters.plot_gcc_usage_and_state,
+    ('GCC Usage and State', plotters.plot_gcc_usage_and_state, 1, 1,
      ['sender.stderr.feather'], 'gcc_usage_state.png'),
-    ('SCTP Stats', plotters.plot_sctp_stats,
+    ('SCTP Stats', plotters.plot_sctp_stats, 1, 1,
      ['sender.stderr.sctp.feather'], 'sctp_stats.png'),
 
-    ('Encoding frame sizes', plotters.plot_encoding_frame_size, [
+    ('Encoding frame sizes', plotters.plot_encoding_frame_size, 1, 1, [
      'sender.stderr.feather'], 'encoding_frame_sizes.png'),
-    ('Decoding frame sizes', plotters.plot_decoding_frame_size, [
+    ('Decoding frame sizes', plotters.plot_decoding_frame_size, 1, 1, [
         'receiver.stderr.feather'], 'receiver_frame_sizes.png'),
 
-    ('Encoding time', plotters.plot_encoding_time, [
+    ('Encoding time', plotters.plot_encoding_time, 1, 1, [
      'sender.stderr.feather'], 'encoding_time.png'),
-    ('Decoding time', plotters.plot_decoding_time, [
+    ('Decoding time', plotters.plot_decoding_time, 1, 1, [
      'receiver.stderr.feather'], 'decoding_time.png'),
 
-    ('E2E Latency', plotters.plot_e2e_latency, [
+    ('E2E Latency', plotters.plot_e2e_latency, 1, 1, [
      'sender.stderr.feather', 'receiver.stderr.feather'], 'e2e_latency.png'),
-    ('Frame Latency e2e', plotters.plot_frame_latency, [
+    ('Frame Latency e2e', plotters.plot_frame_latency, 1, 1, [
      'sender.stderr.feather', 'receiver.stderr.feather'], 'frame_latency.png'),
-    ('Video Quality Metrics', plotters.plot_video_quality, [
+    ('Video Quality Metrics', plotters.plot_video_quality, 1, 1, [
      'video.quality.feather'], 'video_quality.png'),
-    ('Encoded Video Rate', plotters.plot_video_rate, [
+    ('Encoded Video Rate', plotters.plot_video_rate, 1, 1, [
      'sender.stderr.feather'], 'video_rate.png'),
-    ('Encoded Frame Sizes', plotters.plot_frame_size_dist, [
+    ('Encoded Frame Sizes', plotters.plot_frame_size_dist, 1, 1, [
      'sender.stderr.feather'], 'video_frame_size_dist.png'),
-    ('Encoded Frame Sizes', plotters.plot_frame_size, [
+    ('Encoded Frame Sizes', plotters.plot_frame_size, 1, 1, [
      'sender.stderr.feather'], 'video_frame_size.png'),
+
+
+    # plots with several subfigs
+    ('Send Rates + network owd', plotters.plot_all_send_rates_pcaps_owd, 2, 1, [
+     'tc.feather', 'sender.stderr.feather', 'ns4.rtp.feather', 'ns1.rtp.feather', 'ns4.dtls.feather', 'config.feather'], 'all_send_rates_pcaps_owd.png'),
+    ('Send Rates + network owd', plotters.plot_quic_rates_owd, 2, 1, [
+     'tc.feather', 'sender.stderr.feather', 'receiver.stderr.feather', 'sender.feather', 'receiver.feather'], 'quic_rates_owd.png'),
 ]
 
 
@@ -174,8 +181,10 @@ async def plot_cmd(args):
     config = serializers.read_feather(config_feather)
     start_time = pd.Timestamp(config['time'][0])
 
-    for title, func, files, out_name in plots:
-        fig, ax = plt.subplots(nrows=1, ncols=1, figsize=(8, 3))
+    for title, func, num_rows, num_column, files, out_name in plots:
+        fig_height = 3*num_rows
+        fig, ax = plt.subplots(
+            nrows=num_rows, ncols=num_column, figsize=(8, fig_height), sharex=True)
         paths = [Path(args.input) / Path(f) for f in files]
         if all(p.is_file() for p in paths):
             dfs = [serializers.read_feather(p) for p in paths]
@@ -190,9 +199,20 @@ async def plot_cmd(args):
                 f'skipping plot {func.__name__} due to missing dependencies {', '.join(missing)}')
             plt.close(fig)
             continue
-        ax.set_title(title)
+
+        if num_column > 1 or num_rows > 1:
+            fig.suptitle(title)
+            axes = ax.flat if hasattr(ax, 'flat') else (
+                ax if isinstance(ax, list) else [ax])
+            for axis in axes:
+                if axis.get_legend() is not None:
+                    axis.legend(loc='upper right', fontsize='small')
+
+        else:
+            ax.set_title(title)
         fig.autofmt_xdate()
         fig.tight_layout()
+        fig.subplots_adjust(hspace=0.3)
         fig.savefig(Path(args.output) / Path(out_name), dpi=300)
         plt.close(fig)
 
