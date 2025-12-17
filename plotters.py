@@ -199,12 +199,28 @@ def plot_all_send_rates_pcaps_owd(axs, start_time, cap_df, tx_df, rtp_tx_df, rtp
     return rate_plotted or owd_plotted
 
 
-def plot_quic_rates_owd(axs, start_time, cap_df, tx_log_df, rx_log_df, qlog_tx_df, qlog_rx_df):
+def plot_rtp_quic_rates_owd(axs, start_time, cap_df, tx_log_df, rx_log_df, qlog_tx_df, qlog_rx_df):
     rate_plotted = plot_all_send_rates_qlog(
         axs[0], start_time, cap_df, tx_log_df, rx_log_df, qlog_tx_df, only_flow_rates=True)
     owd_plotted = _plot_qlog_owd_per_flow(
         axs[1], start_time, qlog_tx_df, qlog_rx_df, rx_log_df)
     return rate_plotted or owd_plotted
+
+
+def plot_quic_rates_owd(axs, start_time, cap_df, tx_log_df, rx_log_df, qlog_tx_df, qlog_rx_df):
+    plot_capacity(axs[0], start_time, cap_df)
+
+    quic_tx_latency_df = qlog_tx_df[qlog_tx_df['name']
+                                    == 'transport:packet_sent'].copy()
+    if quic_tx_latency_df.empty:
+        return False
+
+    quic_tx_latency_df['rate'] = quic_tx_latency_df['data.raw.length'] * 80
+    _plot_data_rate(axs[0], start_time, quic_tx_latency_df, 'data')
+    _rate_plot_ax_config(axs[0])
+
+    owd_plotted = plot_qlog_owd(axs[1], start_time, qlog_tx_df, qlog_rx_df)
+    return owd_plotted
 
 
 def plot_all_recv_rates_pcaps(ax, start_time, cap_df, tx_df, rtp_rx_df, dtls_rx_df, config_df):
@@ -598,6 +614,8 @@ def plot_rtp_owd_log_roq(ax, start_time, rtp_tx_df, rtp_rx_df, quic_tx_df):
     """ for roq transport. quic_tx_df not used but makes sure it is only called for roq transport"""
 
     tx_mapping = rtp_tx_df[rtp_tx_df['msg'] == 'rtp to pts mapping'].copy()
+    if tx_mapping.empty:
+        return False
     flow_ids = tx_mapping['flow-id'].unique()
     if len(flow_ids) > 1:
         return False

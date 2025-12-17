@@ -112,8 +112,10 @@ plots = [
     # plots with several subfigs
     ('Send Rates + network owd', plotters.plot_all_send_rates_pcaps_owd, 2, 1, [
      'tc.feather', 'sender.stderr.feather', 'ns4.rtp.feather', 'ns1.rtp.feather', 'ns4.dtls.feather', 'config.feather'], 'all_send_rates_pcaps_owd.png'),
-    ('Send Rates + network owd', plotters.plot_quic_rates_owd, 2, 1, [
+    ('Send Rates + network owd', plotters.plot_rtp_quic_rates_owd, 2, 1, [
      'tc.feather', 'sender.stderr.feather', 'receiver.stderr.feather', 'sender.feather', 'receiver.feather'], 'quic_rates_owd.png'),
+    ('Send Rates + network owd (quic overall)', plotters.plot_quic_rates_owd, 2, 1, [
+        'tc.feather', 'sender.stderr.feather', 'receiver.stderr.feather', 'sender.feather', 'receiver.feather'], 'quic_rates_owd_overall.png'),
 ]
 
 
