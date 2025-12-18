@@ -484,6 +484,20 @@ def plot_rtp_owd_pcap(ax, start_time, rtp_tx_df, rtp_rx_df):
     return _plot_owd(ax, start_time, rtp_tx_latency_df, rtp_rx_latency_df, 'extseq', label='rtp')
 
 
+def plot_rtp_owd_pcap_cdf(ax, start_time, rtp_tx_df, rtp_rx_df):
+    rtp_tx_latency_df = rtp_tx_df.copy()
+    rtp_rx_latency_df = rtp_rx_df.copy()
+    rtp_tx_latency_df['ts'] = rtp_tx_df.index
+    rtp_rx_latency_df['ts'] = rtp_rx_df.index
+
+    df = _merge_owd(start_time, rtp_tx_latency_df,
+                    rtp_rx_latency_df, 'extseq')
+    ax.ecdf(df['latency'], label='rtp')
+    ax.set_xlabel("latency (ms)")
+    ax.set_ylabel("CDF")
+    return True
+
+
 def plot_dtls_owd(ax, start_time, dtls_tx_df, dtls_rx_df, config_df):
     sender_ip, receiver_ip = _get_ips_from_config(config_df)
 
@@ -541,6 +555,25 @@ def plot_qlog_owd(ax, start_time, qlog_tx_df, qlog_rx_df):
     quic_tx_latency_df['ts'] = quic_tx_latency_df['time']
     quic_rx_latency_df['ts'] = quic_rx_latency_df['time']
     return _plot_owd(ax, start_time, quic_tx_latency_df, quic_rx_latency_df, 'data.header.packet_number')
+
+
+def plot_qlog_owd_cdf(ax, start_time, qlog_tx_df, qlog_rx_df):
+    quic_tx_latency_df = qlog_tx_df[qlog_tx_df['name']
+                                    == 'transport:packet_sent'].copy()
+    quic_rx_latency_df = qlog_rx_df[qlog_rx_df['name']
+                                    == 'transport:packet_received'].copy()
+
+    if quic_tx_latency_df.empty or quic_rx_latency_df.empty:
+        return False
+
+    quic_tx_latency_df['ts'] = quic_tx_latency_df['time']
+    quic_rx_latency_df['ts'] = quic_rx_latency_df['time']
+    df = _merge_owd(start_time, quic_tx_latency_df,
+                    quic_rx_latency_df,  'data.header.packet_number')
+    ax.ecdf(df['latency'], label='quic')
+    ax.set_xlabel("latency (ms)")
+    ax.set_ylabel("CDF")
+    return True
 
 
 def plot_rtp_owd_log_udp(ax, start_time, rtp_tx_df, rtp_rx_df, pcap_tx_df, pcap_rx_df, config_df):
@@ -970,6 +1003,24 @@ def plot_video_quality(ax, start_time, qm_df):
     ax_psnr.legend(loc='upper left')
     ax_ssim.legend(loc='upper right')
 
+    return True
+
+
+def plot_video_quality_psnr_cdf(ax, _, qm_df):
+    ax.ecdf(qm_df["psnr_avg"], label="psnr avg")
+    ax.set_xlabel("PSNR")
+    ax.set_ylabel("CDF")
+    ax.set_ylim([0, 1])
+    ax.legend(loc='lower right')
+    return True
+
+
+def plot_video_quality_ssim_cdf(ax, _, qm_df):
+    ax.ecdf(qm_df["ssim_avg"], label="ssim avg")
+    ax.set_xlabel("SSIM")
+    ax.set_ylabel("CDF")
+    ax.set_ylim([0, 1])
+    ax.legend(loc='lower right')
     return True
 
 

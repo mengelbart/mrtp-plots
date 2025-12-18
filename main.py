@@ -227,8 +227,10 @@ async def plot_combis_cmd(args):
     if args.mode == 'version':
         plot_version_comparison.plot_version_comparison(
             args.input, args.output)
-    else:
+    elif args.mode == 'link':
         plot_version_comparison.plot_link_comparision(args.input, args.output)
+    else:
+        plot_version_comparison.plot_predefined_comparisons(args.input, args.output)
 
 
 async def calc_video_metrics(args):
@@ -277,8 +279,8 @@ def main():
         '-i', '--input', help='input directory with test cases', required=True)
     plot_combis.add_argument(
         '-o', '--output', help='output directory for plots', required=True)
-    plot_combis.add_argument('-m', '--mode', choices=['version', 'link'], default='version',
-                             help='comparison mode: "version" combines by test version (e.g. each webrtc-gcc test), "link" combines by link type (e.g. each static test)')
+    plot_combis.add_argument('-m', '--mode', choices=['version', 'link', "defined"], default='version',
+                             help='comparison mode: "version" combines by test version (e.g. each webrtc-gcc test), "link" combines by link type (e.g. each static test), "defined" uses predefined combinations')
     plot_combis.set_defaults(func=plot_combis_cmd)
 
     video_qm = subparsers.add_parser(
