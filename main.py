@@ -295,8 +295,8 @@ def main():
         '-i', '--input', help='input directory with test cases', required=True)
     plot_combis.add_argument(
         '-o', '--output', help='output directory for plots', required=True)
-    plot_combis.add_argument('-m', '--mode', choices=['version', 'link', "defined"], default='version',
-                             help='comparison mode: "version" combines by test version (e.g. each webrtc-gcc test), "link" combines by link type (e.g. each static test), "defined" uses predefined combinations')
+    plot_combis.add_argument('-m', '--mode', choices=['version', 'link', "default"], default='version',
+                             help='comparison mode: "version" combines by test version (e.g. each webrtc-gcc test), "link" combines by link type (e.g. each static test), "default" uses predefined combinations')
     plot_combis.set_defaults(func=plot_combis_cmd)
 
     video_qm = subparsers.add_parser(
