@@ -601,14 +601,16 @@ def plot_rtp_owd_pcap(ax, start_time, rtp_tx_df, rtp_rx_df):
     return _plot_owd(ax, start_time, rtp_tx_latency_df, rtp_rx_latency_df, 'extseq', label='rtp')
 
 
-def plot_rtp_owd_pcap_cdf(ax, start_time, rtp_tx_df, rtp_rx_df):
+def get_rtp_owd_pcap_df(start_time, rtp_tx_df, rtp_rx_df):
     rtp_tx_latency_df = rtp_tx_df.copy()
     rtp_rx_latency_df = rtp_rx_df.copy()
     rtp_tx_latency_df['ts'] = rtp_tx_df.index
     rtp_rx_latency_df['ts'] = rtp_rx_df.index
+    return _merge_owd(start_time, rtp_tx_latency_df, rtp_rx_latency_df, 'extseq')
 
-    df = _merge_owd(start_time, rtp_tx_latency_df,
-                    rtp_rx_latency_df, 'extseq')
+
+def plot_rtp_owd_pcap_cdf(ax, start_time, rtp_tx_df, rtp_rx_df):
+    df = get_rtp_owd_pcap_df(start_time, rtp_tx_df, rtp_rx_df)
     ax.ecdf(df['latency'], label='rtp')
     ax.set_xlabel("latency (ms)")
     ax.set_ylabel("CDF")
@@ -677,19 +679,26 @@ def plot_qlog_owd(ax, start_time, qlog_tx_df, qlog_rx_df):
     return _plot_owd(ax, start_time, quic_tx_latency_df, quic_rx_latency_df, 'data.header.packet_number')
 
 
-def plot_qlog_owd_cdf(ax, start_time, qlog_tx_df, qlog_rx_df):
+def get_qlog_owd_df(start_time, qlog_tx_df, qlog_rx_df):
     quic_tx_latency_df = qlog_tx_df[qlog_tx_df['name']
                                     == 'transport:packet_sent'].copy()
     quic_rx_latency_df = qlog_rx_df[qlog_rx_df['name']
                                     == 'transport:packet_received'].copy()
 
     if quic_tx_latency_df.empty or quic_rx_latency_df.empty:
-        return False
+        return False, pd.DataFrame()
 
     quic_tx_latency_df['ts'] = quic_tx_latency_df['time']
     quic_rx_latency_df['ts'] = quic_rx_latency_df['time']
-    df = _merge_owd(start_time, quic_tx_latency_df,
-                    quic_rx_latency_df,  'data.header.packet_number')
+    return True, _merge_owd(start_time, quic_tx_latency_df,
+                            quic_rx_latency_df,  'data.header.packet_number')
+
+
+def plot_qlog_owd_cdf(ax, start_time, qlog_tx_df, qlog_rx_df):
+    ok, df = get_qlog_owd_df(start_time, qlog_tx_df, qlog_rx_df)
+    if not ok:
+        return False
+
     ax.ecdf(df['latency'], label='quic')
     ax.set_xlabel("latency (ms)")
     ax.set_ylabel("CDF")

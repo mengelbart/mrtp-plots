@@ -126,6 +126,56 @@ def plot_owd_cdf(name, cases, out):
     plt.close()
 
 
+def plot_owd_boxplot(name, cases, out):
+    legend = []
+    dfs = []
+    image_name = Path(out) / Path(f"{name}_delay_box.png")
+
+    fig, ax = plt.subplots(dpi=FIG_DPI, figsize=FIG_SIZE)
+
+    for case in cases:
+        start_time = _get_start_time(case[1])
+
+        # pcap owd
+        rtp_pcap_tx = Path(case[1]) / Path('ns4.rtp.feather')
+        rtp_pcap_rx = Path(case[1]) / Path('ns1.rtp.feather')
+
+        if rtp_pcap_tx.is_file() and rtp_pcap_rx.is_file():
+            rtp_pcap_tx_df = serializers.read_feather(rtp_pcap_tx)
+            rtp_pcap_rx_df = serializers.read_feather(rtp_pcap_rx)
+
+            df = plotters.get_rtp_owd_pcap_df(
+                start_time, rtp_pcap_tx_df, rtp_pcap_rx_df)
+            dfs.append(df)
+            legend.append(case[2])
+            continue
+
+        # quic owd TODO: also only rtp owd?
+        qlog_tx_feather = Path(case[1]) / Path("sender.feather")
+        qlog_rx_feater = Path(case[1]) / Path("receiver.feather")
+
+        if qlog_tx_feather.is_file() and qlog_rx_feater.is_file():
+            qlog_tx_df = serializers.read_feather(qlog_tx_feather)
+            qlog_rx_df = serializers.read_feather(qlog_rx_feater)
+
+            ok, delay_df = plotters.get_qlog_owd_df(
+                start_time, qlog_tx_df, qlog_rx_df)
+            if ok:
+                dfs.append(delay_df)
+                legend.append(case[2])
+
+    ax.boxplot([df['latency'] for df in dfs], tick_labels=legend)
+    ax.yaxis.set_major_formatter(
+        mticker.FuncFormatter(lambda x, pos: f'{x*1000:.0f}'))
+
+    ax.set_ylabel("latency (ms)")
+    ax.set_title(image_name.name.split("/")[-1].replace(".png", ""))
+
+    fig.tight_layout()
+    fig.savefig(image_name, bbox_inches="tight")
+    plt.close()
+
+
 def plot_target_rate(name, cases, out):
     legend = []
     image_name = Path(out) / Path(f"{name}_target-rate.png")
@@ -149,7 +199,8 @@ def plot_target_rate(name, cases, out):
     _save_rate_graph(ax, fig, image_name, legend, "Rate")
 
 
-def plot_video_quality(plot_name, cases, out, name, plot_fct): # TODO: remove additonal name arg
+# TODO: remove additonal name arg
+def plot_video_quality(plot_name, cases, out, name, plot_fct):
     legend = []
     image_name = Path(out) / Path(f"{plot_name}_{name}.png")
 
@@ -179,6 +230,7 @@ def plot_everything(name, cases, out):
     """Plots all version comparison plots"""
     plot_fdelay(name, cases, out)
     plot_owd_cdf(name, cases, out)
+    plot_owd_boxplot(name, cases, out)
     plot_target_rate(name, cases, out)
     plot_video_quality(name, cases, out, "ssim",
                        plotters.plot_video_quality_ssim_cdf)
