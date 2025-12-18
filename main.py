@@ -43,11 +43,11 @@ plots = [
      'tc.feather', 'sender.stderr.feather', 'receiver.stderr.feather', 'receiver.feather'], 'all_recv_rates_qlog.png'),
 
     # loss
-    ('RTP Network Loss Rate (pcap)', plotters.plot_rtp_loss_pcap, 1, 1, ['ns4.rtp.feather',
+    ('RTP Network Loss Rate (pcap)', plotters.plot_rtp_loss_rate_pcap, 1, 1, ['ns4.rtp.feather',
      'ns1.rtp.feather'], 'rtp_loss.png'),
-    ('RTP Loss Rate (network)', plotters.plot_rtp_loss_log, 1, 1, ['sender.stderr.feather',
+    ('RTP Loss Rate (network)', plotters.plot_rtp_loss_rate_log, 1, 1, ['sender.stderr.feather',
      'receiver.stderr.feather'], 'rtp_loss_net.png'),
-    ('RTP Loss Rate (after jitter)', plotters.plot_rtp_full_loss_log, 1, 1, ['sender.stderr.feather',
+    ('RTP Loss Rate (after jitter)', plotters.plot_rtp_full_loss_rate_log, 1, 1, ['sender.stderr.feather',
      'receiver.stderr.feather'], 'rtp_loss_full.png'),
 
     # OWD
@@ -110,12 +110,27 @@ plots = [
 
 
     # plots with several subfigs
-    ('Send Rates + network owd', plotters.plot_all_send_rates_pcaps_owd, 2, 1, [
+    # pcap plots twice: plot first without dtls and override it if dtls present
+
+    # Send rate + owd
+    ('Send Rates + network owd', plotters.plot_all_send_rates_and_owd_pcaps_nodtls, 2, 1, [
+     'tc.feather', 'sender.stderr.feather', 'ns4.rtp.feather', 'ns1.rtp.feather', 'config.feather'], 'all_send_rates_pcaps_owd.png'),
+    ('Send Rates + network owd', plotters.plot_all_send_rates_and_owd_pcaps, 2, 1, [
      'tc.feather', 'sender.stderr.feather', 'ns4.rtp.feather', 'ns1.rtp.feather', 'ns4.dtls.feather', 'config.feather'], 'all_send_rates_pcaps_owd.png'),
-    ('Send Rates + network owd', plotters.plot_rtp_quic_rates_owd, 2, 1, [
+    ('Send Rates + network owd', plotters.plot_rtp_rates_and_owd_quic, 2, 1, [
      'tc.feather', 'sender.stderr.feather', 'receiver.stderr.feather', 'sender.feather', 'receiver.feather'], 'quic_rates_owd.png'),
-    ('Send Rates + network owd (quic overall)', plotters.plot_quic_rates_owd, 2, 1, [
-        'tc.feather', 'sender.stderr.feather', 'receiver.stderr.feather', 'sender.feather', 'receiver.feather'], 'quic_rates_owd_overall.png'),
+    ('Send Rates + network owd (quic overall)', plotters.plot_send_rates_and_owd_quic, 2, 1, [
+     'tc.feather', 'sender.stderr.feather', 'receiver.stderr.feather', 'sender.feather', 'receiver.feather'], 'quic_rates_owd_overall.png'),
+
+    # Send rate + loss
+    ('Send Rates + losses', plotters.plot_all_send_rates_and_loss_pcaps_nodtls, 2, 1, [
+     'tc.feather', 'sender.stderr.feather', 'ns4.rtp.feather', 'ns1.rtp.feather', 'config.feather'], 'all_send_rates_pcaps_loss.png'),
+    ('Send Rates + losses', plotters.plot_all_send_rates_and_loss_pcaps, 2, 1, [
+     'tc.feather', 'sender.stderr.feather', 'ns4.rtp.feather', 'ns1.rtp.feather', 'ns4.dtls.feather', 'config.feather'], 'all_send_rates_pcaps_loss.png'),
+    ('Send Rates + losses', plotters.plot_rtp_rates_and_loss_quic, 2, 1, [
+     'tc.feather', 'sender.stderr.feather', 'receiver.stderr.feather', 'sender.feather', 'receiver.feather'], 'quic_rates_loss.png'),
+    ('Send Rates + losses (quic overall)', plotters.plot_send_rates_and_loss_quic, 2, 1, [
+     'tc.feather', 'sender.stderr.feather', 'receiver.stderr.feather', 'sender.feather', 'receiver.feather'], 'quic_rates_loss_overall.png'),
 ]
 
 
@@ -230,7 +245,8 @@ async def plot_combis_cmd(args):
     elif args.mode == 'link':
         plot_version_comparison.plot_link_comparision(args.input, args.output)
     else:
-        plot_version_comparison.plot_predefined_comparisons(args.input, args.output)
+        plot_version_comparison.plot_predefined_comparisons(
+            args.input, args.output)
 
 
 async def calc_video_metrics(args):
