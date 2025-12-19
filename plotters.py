@@ -255,7 +255,7 @@ def _plot_send_rate_quic(ax, start_time, cap_df, tx_log_df, rx_log_df, qlog_tx_d
         return False
 
     quic_tx_latency_df['rate'] = quic_tx_latency_df['data.raw.length'] * 80
-    _plot_data_rate(ax, start_time, quic_tx_latency_df, 'data')
+    _plot_data_rate(ax, start_time, quic_tx_latency_df, 'quic')
     _rate_plot_ax_config(ax)
     return True
 
@@ -706,7 +706,7 @@ def plot_qlog_owd_cdf(ax, start_time, qlog_tx_df, qlog_rx_df):
 
 
 def plot_rtp_owd_log_udp(ax, start_time, rtp_tx_df, rtp_rx_df, pcap_tx_df, pcap_rx_df, config_df):
-    """ for upp and webrtc transport"""
+    """ for udp and webrtc transport"""
 
     tx_mapping = rtp_tx_df[rtp_tx_df['msg'] == 'rtp to pts mapping'].copy()
     rx_mapping = rtp_rx_df[rtp_rx_df['msg'] == 'rtp to pts mapping'].copy()
@@ -1175,8 +1175,8 @@ def plot_video_rate(ax, start_time, rx_df):
     return True
 
 
-def plot_frame_size_dist(ax, start_time, rx_df):
-    rx_data = rx_df[rx_df['msg'] == 'encoder src'].copy()
+def plot_frame_size_dist(ax, start_time, tx_df):
+    rx_data = tx_df[tx_df['msg'] == 'encoder src'].copy()
     if rx_data.empty:
         return False
 
@@ -1202,8 +1202,8 @@ def plot_frame_size_dist(ax, start_time, rx_df):
     return True
 
 
-def plot_frame_size(ax, start_time, rx_df):
-    rx_data = rx_df[rx_df['msg'] == 'encoder src'].copy()
+def plot_frame_size(ax, start_time, tx_df):
+    rx_data = tx_df[tx_df['msg'] == 'encoder src'].copy()
     if rx_data.empty:
         return False
 
@@ -1220,4 +1220,15 @@ def plot_frame_size(ax, start_time, rx_df):
     ax.legend(loc='upper right')
     ax.grid(True, axis='y', linestyle='--', alpha=0.3)
 
+    return True
+
+
+def plot_frame_size_and_tr(axs, start_time, cap_df, tx_df, rx_df):
+    plot_capacity(axs[0], start_time, cap_df)
+    plot_target_rate(
+        axs[0], start_time, tx_df, label='tr all')
+
+    plot_frame_size(axs[1], start_time, tx_df)
+
+    _rate_plot_ax_config(axs[0])
     return True
