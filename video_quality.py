@@ -168,8 +168,12 @@ def calculate_quality_metrics(ref_file, input_dir, out_dir):
     cam = cv2.VideoCapture(ref_file)
     fps = cam.get(cv2.CAP_PROP_FPS)
 
-    lost_frames = get_lost_frames(f'{input_dir}/sender.stderr.log',
-                                  f'{input_dir}/receiver.stderr.log')
+    try:
+        lost_frames = get_lost_frames(f'{input_dir}/sender.stderr.log',
+                                      f'{input_dir}/receiver.stderr.log')
+    except (KeyError):
+        print("Invalid log files")
+        return
 
     config = parsers.parse_json_log_no_convert(f'{input_dir}/config.json')
     duration = config['duration'][0]
