@@ -131,6 +131,10 @@ plots = [
      'tc.feather', 'sender.stderr.feather', 'receiver.stderr.feather', 'sender.feather', 'receiver.feather'], 'quic_rates_loss.png'),
     ('Send Rates + losses (quic overall)', plotters.plot_send_rates_and_loss_quic, 2, 1, [
      'tc.feather', 'sender.stderr.feather', 'receiver.stderr.feather', 'sender.feather', 'receiver.feather'], 'quic_rates_loss_overall.png'),
+
+    # plots for understanding the encoder behavior
+    ('frame size + tr', plotters.plot_frame_size_and_tr, 2, 1, [
+     'tc.feather', 'sender.stderr.feather', 'receiver.stderr.feather'], 'video_frame_tr.png'),
 ]
 
 

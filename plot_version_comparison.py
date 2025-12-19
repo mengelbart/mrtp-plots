@@ -199,7 +199,6 @@ def plot_target_rate(name, cases, out):
     _save_rate_graph(ax, fig, image_name, legend, "Rate")
 
 
-# TODO: remove additonal name arg
 def plot_video_quality(plot_name, cases, out, name, plot_fct):
     legend = []
     image_name = Path(out) / Path(f"{plot_name}_{name}.png")
