@@ -65,7 +65,7 @@ def parse_pion_sctp_log(log_file, ref_time):
     return df
 
 
-def parse_qlog(log_file):
+def parse_quic_qlog(log_file):
     with open(log_file, 'r') as f:
         data = _read_json_lines(f)
 
@@ -77,6 +77,23 @@ def parse_qlog(log_file):
     df = pd.json_normalize(data)
 
     df = df[df['data.header.packet_type'] == '1RTT']
+
+    # add reference time to all relative timestamps
+    df["time"] = pd.to_timedelta(df["time"], unit="ms") + reference_time
+
+    return df
+
+
+def parse_roq_qlog(log_file):
+    with open(log_file, 'r') as f:
+        data = _read_json_lines(f)
+
+    # reference time is in local time zone
+    reference_time = data[0]['trace']["common_fields"]['reference_time']
+    reference_time = pd.to_datetime(
+        reference_time)
+
+    df = pd.json_normalize(data)
 
     # add reference time to all relative timestamps
     df["time"] = pd.to_timedelta(df["time"], unit="ms") + reference_time
