@@ -38,9 +38,9 @@ plots = [
     ('Receive Rates (pcap)', plotters.plot_all_recv_rates_pcaps, 1, 1, [
      'tc.feather', 'sender.stderr.feather', 'ns1.rtp.feather', 'ns1.dtls.feather', 'config.feather'], 'all_recv_rates_pcaps.png'),
     ('Send Rates (qlog)', plotters.plot_all_send_rates_qlog, 1, 1, [
-     'tc.feather', 'sender.stderr.feather', 'receiver.stderr.feather', 'sender.feather'], 'all_send_rates_qlog.png'),
+     'tc.feather', 'sender.stderr.feather', 'receiver.stderr.feather', 'sender.feather', 'sender.roq.feather'], 'all_send_rates_qlog.png'),
     ('Receive Rates (qlog)', plotters.plot_all_recv_rates_qlog, 1, 1, [
-     'tc.feather', 'sender.stderr.feather', 'receiver.stderr.feather', 'receiver.feather'], 'all_recv_rates_qlog.png'),
+     'tc.feather', 'sender.stderr.feather', 'receiver.stderr.feather', 'receiver.feather', 'sender.roq.feather'], 'all_recv_rates_qlog.png'),
 
     # loss
     ('RTP Network Loss Rate (pcap)', plotters.plot_rtp_loss_rate_pcap, 1, 1, ['ns4.rtp.feather',
@@ -118,7 +118,7 @@ plots = [
     ('Send Rates + network owd', plotters.plot_all_send_rates_and_owd_pcaps, 2, 1, [
      'tc.feather', 'sender.stderr.feather', 'ns4.rtp.feather', 'ns1.rtp.feather', 'ns4.dtls.feather', 'config.feather'], 'all_send_rates_pcaps_owd.png'),
     ('Send Rates + network owd', plotters.plot_rtp_rates_and_owd_quic, 2, 1, [
-     'tc.feather', 'sender.stderr.feather', 'receiver.stderr.feather', 'sender.feather', 'receiver.feather'], 'quic_rates_owd.png'),
+     'tc.feather', 'sender.stderr.feather', 'receiver.stderr.feather', 'sender.feather', 'receiver.feather', 'sender.roq.feather'], 'quic_rates_owd.png'),
     ('Send Rates + network owd (quic overall)', plotters.plot_send_rates_and_owd_quic, 2, 1, [
      'tc.feather', 'sender.stderr.feather', 'receiver.stderr.feather', 'sender.feather', 'receiver.feather'], 'quic_rates_owd_overall.png'),
 
@@ -128,7 +128,7 @@ plots = [
     ('Send Rates + losses', plotters.plot_all_send_rates_and_loss_pcaps, 2, 1, [
      'tc.feather', 'sender.stderr.feather', 'ns4.rtp.feather', 'ns1.rtp.feather', 'ns4.dtls.feather', 'config.feather'], 'all_send_rates_pcaps_loss.png'),
     ('Send Rates + losses', plotters.plot_rtp_rates_and_loss_quic, 2, 1, [
-     'tc.feather', 'sender.stderr.feather', 'receiver.stderr.feather', 'sender.feather', 'receiver.feather'], 'quic_rates_loss.png'),
+     'tc.feather', 'sender.stderr.feather', 'receiver.stderr.feather', 'sender.feather', 'receiver.feather', 'sender.roq.feather'], 'quic_rates_loss.png'),
     ('Send Rates + losses (quic overall)', plotters.plot_send_rates_and_loss_quic, 2, 1, [
      'tc.feather', 'sender.stderr.feather', 'receiver.stderr.feather', 'sender.feather', 'receiver.feather'], 'quic_rates_loss_overall.png'),
 
@@ -145,7 +145,11 @@ async def parse_file(input, out_dir, ref_time=None):
         serializers.write_feather(
             df, Path(out_dir) / Path(input).with_suffix('.feather').name)
     if path.name in ['sender.qlog', 'receiver.qlog']:
-        df = parsers.parse_qlog(input)
+        df = parsers.parse_quic_qlog(input)
+        serializers.write_feather(
+            df, Path(out_dir) / Path(input).with_suffix('.feather').name)
+    if path.name in ['sender.roq.qlog']:
+        df = parsers.parse_roq_qlog(input)
         serializers.write_feather(
             df, Path(out_dir) / Path(input).with_suffix('.feather').name)
     if path.name in ['sender.stderr.log']:
