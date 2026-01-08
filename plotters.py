@@ -288,12 +288,12 @@ def _plot_all_qlog_rates(ax, start_time, cap_df, tx_df, rx_df, quic_df, roq_df, 
     # get frames
     qlog_frames = _explode_qlog_frames(quic_df)
 
-    stream_mapping = roq_df[roq_df['name'] == 'roq:stream_opened']
-    if stream_mapping.empty:
+    roq_stream_mapping = roq_df[roq_df['name'] == 'roq:stream_opened']
+    if roq_stream_mapping.empty:
         return False
 
     # plot each RTP flow separately
-    rtp_streams_mapping = stream_mapping[stream_mapping['data.flow_id'].isin(
+    rtp_streams_mapping = roq_stream_mapping[roq_stream_mapping['data.flow_id'].isin(
         _RTP_FOW_IDS)]
 
     if rtp_streams_mapping.empty:
@@ -314,12 +314,13 @@ def _plot_all_qlog_rates(ax, start_time, cap_df, tx_df, rx_df, quic_df, roq_df, 
         return False
 
     # plot data stream
-    data_streams_mapping = stream_mapping[stream_mapping['data.flow_id'] == 3]
+    dc_stream_mapping = rx_df[rx_df['msg'] == 'new dc stream']
+    data_streams_mapping = dc_stream_mapping[dc_stream_mapping['flowID'] == 3]
 
     data_df = pd.DataFrame()
     if not data_streams_mapping.empty:
         data_tx = qlog_frames.merge(
-            data_streams_mapping, left_on='stream_id', right_on='data.stream_id', suffixes=['', '_mapping'])
+            data_streams_mapping, left_on='stream_id', right_on='streamID', suffixes=['', '_mapping'])
 
         # length is length field of the frame
         data_tx['rate'] = data_tx['length'] * 80
@@ -478,7 +479,7 @@ def _plot_rtp_loss_count_quic(ax, start_time, qlog_tx_df, qlog_rx_df, roq_df):
 
     if quic_tx_df.empty or quic_rx_df.empty:
         return False
-    
+
     stream_mapping = roq_df[roq_df['name'] == 'roq:stream_opened']
     if stream_mapping.empty:
         return False
