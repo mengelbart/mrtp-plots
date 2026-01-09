@@ -77,13 +77,13 @@ def plot_rtp_rates_log(ax, start_time, cap_df, tx_df, rx_df):
 
 def _plot_rtp_send_rate_pcaps(ax, start_time, sender_ip, rtp_tx_df, name='tx'):
     rtp_tx_df = rtp_tx_df[rtp_tx_df['src'] == sender_ip].copy()
-    rtp_tx_df['rate'] = rtp_tx_df['length'] * 80
+    rtp_tx_df['rate'] = rtp_tx_df['length'] * 8
     return _plot_rate(ax, start_time, rtp_tx_df, name)
 
 
 def _plot_rtp_recv_rate_pcaps(ax, start_time, receiver_ip, rtp_rx_df, name='rx'):
     rtp_rx_df = rtp_rx_df[rtp_rx_df['dst'] == receiver_ip].copy()
-    rtp_rx_df['rate'] = rtp_rx_df['length'] * 80
+    rtp_rx_df['rate'] = rtp_rx_df['length'] * 8
     return _plot_rate(ax, start_time, rtp_rx_df, name)
 
 
@@ -114,10 +114,10 @@ def plot_quic_rates(ax, start_time, cap_df, tx_log_df, qlog_tx_df, qlog_rx_df):
     if quic_tx_latency_df.empty or quic_rx_latency_df.empty:
         return False
 
-    quic_tx_latency_df['rate'] = quic_tx_latency_df['data.raw.payload_length'] * 80
+    quic_tx_latency_df['rate'] = quic_tx_latency_df['data.raw.payload_length'] * 8
     _plot_data_rate(ax, start_time, quic_tx_latency_df, 'tx')
 
-    quic_rx_latency_df['rate'] = quic_rx_latency_df['data.raw.length'] * 80
+    quic_rx_latency_df['rate'] = quic_rx_latency_df['data.raw.length'] * 8
     _plot_data_rate(ax, start_time, quic_rx_latency_df, 'rx')
 
     _rate_plot_ax_config(ax)
@@ -254,7 +254,7 @@ def _plot_send_rate_quic(ax, start_time, cap_df, tx_log_df, rx_log_df, qlog_tx_d
     if quic_tx_latency_df.empty:
         return False
 
-    quic_tx_latency_df['rate'] = quic_tx_latency_df['data.raw.length'] * 80
+    quic_tx_latency_df['rate'] = quic_tx_latency_df['data.raw.length'] * 8
     _plot_data_rate(ax, start_time, quic_tx_latency_df, 'quic')
     _rate_plot_ax_config(ax)
     return True
@@ -304,7 +304,7 @@ def _plot_all_qlog_rates(ax, start_time, cap_df, tx_df, rx_df, quic_df, roq_df, 
         flow_mapping = rtp_streams_mapping[rtp_streams_mapping['data.flow_id'] == flow_id]
         rtp_tx = qlog_frames.merge(
             flow_mapping, left_on='stream_id', right_on='data.stream_id', suffixes=['', '_mapping'])
-        rtp_tx['rate'] = rtp_tx['length'] * 80
+        rtp_tx['rate'] = rtp_tx['length'] * 8
         plotted, media_df = _plot_data_rate(
             ax, start_time, rtp_tx, f'media flow {int(flow_id)}')
         if plotted:
@@ -323,7 +323,7 @@ def _plot_all_qlog_rates(ax, start_time, cap_df, tx_df, rx_df, quic_df, roq_df, 
             data_streams_mapping, left_on='stream_id', right_on='streamID', suffixes=['', '_mapping'])
 
         # length is length field of the frame
-        data_tx['rate'] = data_tx['length'] * 80
+        data_tx['rate'] = data_tx['length'] * 8
 
         _, data_df = _plot_data_rate(ax, start_time, data_tx, 'data')
 
@@ -428,7 +428,7 @@ def plot_rtp_rate_logging(ax, start_time, df, label):
     df = df[df['msg'] == 'rtp packet'].copy()
     if df.empty:
         return False, df
-    df['rate'] = df['rtp-packet.payload-length'] * 80
+    df['rate'] = df['rtp-packet.payload-length'] * 8
     return _plot_data_rate(ax, start_time, df, label)
 
 
@@ -436,19 +436,26 @@ def plot_data_rate(ax, start_time, df, label, event_name='DataSource sent data')
     df = df[df['msg'] == event_name].copy()
     if df.empty:
         return False, df
-    df['rate'] = df['payload-length'] * 80
+    df['rate'] = df['payload-length'] * 8
     return _plot_data_rate(ax, start_time, df, label)
 
 
 def _plot_rate(ax, start_time, df, label):
     """time as index and rate as column"""
-    df = df.resample('100ms').sum(numeric_only=True).copy()
-
     df['second'] = (df.index - start_time).total_seconds()
-    df.set_index('second', inplace=True)
-    ax.plot(df.index, df['rate'], label=label, linewidth=0.5)
+    df['second'] = df['second'].astype(int)  # Round to nearest second
+    df_grouped = df.groupby('second')['rate'].sum().reset_index()
+    
+    # Remove any data before time 0
+    df_grouped = df_grouped[df_grouped['second'] >= 0]
+    
+    df_grouped.set_index('second', inplace=True)
+    
+    # Only plot if there's data
+    if not df_grouped.empty:
+        ax.plot(df_grouped.index, df_grouped['rate'], label=label, linewidth=0.5)
 
-    return True, df
+    return True, df_grouped
 
 
 def _plot_data_rate(ax, start_time, df, label):
@@ -643,13 +650,13 @@ def _plot_dlts_send_rate(ax, start_time, sender_ip, dtls_tx_df, name='tx'):
         return False, pd.DataFrame()
 
     dtls_tx_df = dtls_tx_df[dtls_tx_df['src'] == sender_ip].copy()
-    dtls_tx_df['rate'] = dtls_tx_df['length'] * 80
+    dtls_tx_df['rate'] = dtls_tx_df['length'] * 8
     return _plot_rate(ax, start_time, dtls_tx_df, name)
 
 
 def _plot_dlts_recv_rate(ax, start_time, receiver_ip, dtls_rx_df, name='rx'):
     dtls_rx_df = dtls_rx_df[dtls_rx_df['dst'] == receiver_ip].copy()
-    dtls_rx_df['rate'] = dtls_rx_df['length'] * 80
+    dtls_rx_df['rate'] = dtls_rx_df['length'] * 8
     return _plot_rate(ax, start_time, dtls_rx_df, name)
 
 
@@ -1166,14 +1173,14 @@ def plot_video_rate(ax, start_time, rx_df):
             # Plot each flow separately
             for flow_id in flow_ids:
                 flow_data = rx_data[rx_data['flow-id'] == flow_id].copy()
-                flow_data['rate'] = flow_data['length'] * 80
+                flow_data['rate'] = flow_data['length'] * 8
                 _plot_data_rate(ax, start_time, flow_data,
                                 f'video rate flow {int(flow_id)}')
         else:
-            rx_data['rate'] = rx_data['length'] * 80
+            rx_data['rate'] = rx_data['length'] * 8
             _plot_data_rate(ax, start_time, rx_data, 'video rate')
     else:
-        rx_data['rate'] = rx_data['length'] * 80
+        rx_data['rate'] = rx_data['length'] * 8
         _plot_data_rate(ax, start_time, rx_data, 'video rate')
 
     _rate_plot_ax_config(ax)
