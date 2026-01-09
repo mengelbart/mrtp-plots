@@ -174,10 +174,6 @@ def plot_all_recv_rates(ax, start_time, cap_df, tx_df, rx_df):
 
 def plot_all_send_rates_pcaps(ax, start_time, cap_df, tx_df, rtp_tx_df, dtls_tx_df, config_df, only_flow_rates=False):
     plot_capacity(ax, start_time, cap_df)
-    if not only_flow_rates:
-        plot_target_rate(
-            ax, start_time, tx_df, event_name='NEW_TARGET_RATE', label='tr all')
-        plot_target_rate(ax, start_time, tx_df, label='tr media')
 
     sender_ip, _ = _get_ips_from_config(config_df)
 
@@ -188,6 +184,12 @@ def plot_all_send_rates_pcaps(ax, start_time, cap_df, tx_df, rtp_tx_df, dtls_tx_
 
     if not only_flow_rates:
         _plot_data_media_sum_rate(ax, data_df, media_df)
+
+    # if not only_flow_rates:
+    plot_target_rate(ax, start_time, tx_df, label='tr media')
+    plot_target_rate(
+        ax, start_time, tx_df, event_name='NEW_TARGET_RATE', label='tr all')
+
     _rate_plot_ax_config(ax)
     return True
 
@@ -280,11 +282,6 @@ def plot_all_recv_rates_pcaps(ax, start_time, cap_df, tx_df, rtp_rx_df, dtls_rx_
 def _plot_all_qlog_rates(ax, start_time, cap_df, tx_df, rx_df, quic_df, roq_df, only_flow_rates=False):
     plot_capacity(ax, start_time, cap_df)
 
-    if not only_flow_rates:
-        plot_target_rate(
-            ax, start_time, tx_df, event_name='NEW_TARGET_RATE', label='tr all')
-        plot_target_rate(ax, start_time, tx_df, label='tr media')
-
     # get frames
     qlog_frames = _explode_qlog_frames(quic_df)
 
@@ -305,8 +302,10 @@ def _plot_all_qlog_rates(ax, start_time, cap_df, tx_df, rx_df, quic_df, roq_df, 
         rtp_tx = qlog_frames.merge(
             flow_mapping, left_on='stream_id', right_on='data.stream_id', suffixes=['', '_mapping'])
         rtp_tx['rate'] = rtp_tx['length'] * 8
-        plotted, media_df = _plot_data_rate(
-            ax, start_time, rtp_tx, f'media flow {int(flow_id)}')
+        name = 'media'
+        if len(media_dfs) > 1:
+            name = f'media flow {int(flow_id)}'
+        plotted, media_df = _plot_data_rate(ax, start_time, rtp_tx, name)
         if plotted:
             media_dfs.append(media_df)
 
@@ -332,6 +331,11 @@ def _plot_all_qlog_rates(ax, start_time, cap_df, tx_df, rx_df, quic_df, roq_df, 
         media_sum_df = pd.concat(media_dfs).groupby(
             level=0).sum(numeric_only=True)
         _plot_data_media_sum_rate(ax, data_df, media_sum_df)
+
+    # if not only_flow_rates:
+    plot_target_rate(ax, start_time, tx_df, label='tr media')
+    plot_target_rate(
+        ax, start_time, tx_df, event_name='NEW_TARGET_RATE', label='tr all')
 
     _rate_plot_ax_config(ax)
     return True
@@ -366,7 +370,8 @@ def _plot_qlog_owd_per_flow(ax, start_time, qlog_tx_df, qlog_rx_df, roq_df):
     rtp_streams_mapping = stream_mapping[stream_mapping['data.flow_id'].isin(
         _RTP_FOW_IDS)]
 
-    for flow_id in sorted(rtp_streams_mapping['data.flow_id'].unique()):
+    flow_ids = rtp_streams_mapping['data.flow_id'].unique()
+    for flow_id in sorted(flow_ids):
         flow_mapping = rtp_streams_mapping[rtp_streams_mapping['data.flow_id'] == flow_id]
         rtp_tx = tx_qlog_frames.merge(
             flow_mapping, left_on='stream_id', right_on='data.stream_id', suffixes=['', '_mapping'])
@@ -375,8 +380,11 @@ def _plot_qlog_owd_per_flow(ax, start_time, qlog_tx_df, qlog_rx_df, roq_df):
         rtp_tx['ts'] = rtp_tx['time']
         rtp_rx['ts'] = rtp_rx['time']
 
+        name = 'media'
+        if len(flow_ids) > 1:
+            name = f'media flow {int(flow_id)}'
         _plot_owd(ax, start_time, rtp_tx, rtp_rx,
-                  'data.header.packet_number', label=f'media flow {int(flow_id)}')
+                  'data.header.packet_number', label=name)
 
     return True
 
@@ -442,20 +450,27 @@ def plot_data_rate(ax, start_time, df, label, event_name='DataSource sent data')
 
 def _plot_rate(ax, start_time, df, label):
     """time as index and rate as column"""
+
     df['second'] = (df.index - start_time).total_seconds()
     df['second'] = df['second'].astype(int)  # Round to nearest second
     df_grouped = df.groupby('second')['rate'].sum().reset_index()
-    
-    # Remove any data before time 0
-    df_grouped = df_grouped[df_grouped['second'] >= 0]
-    
-    df_grouped.set_index('second', inplace=True)
-    
+
     # Only plot if there's data
     if not df_grouped.empty:
-        ax.plot(df_grouped.index, df_grouped['rate'], label=label, linewidth=0.5)
+        # Fill in zeros
+        first_second = df_grouped['second'].min()
+        last_second = df_grouped['second'].max()
+        all_seconds = pd.DataFrame(
+            {'second': range(int(first_second), int(last_second) + 1)})
+        df_grouped = all_seconds.merge(df_grouped, on='second', how='left')
+        df_grouped['rate'] = df_grouped['rate'].fillna(0)
 
-    return True, df_grouped
+        df_grouped.set_index('second', inplace=True)
+        ax.plot(df_grouped.index,
+                df_grouped['rate'], label=label, linewidth=0.5)
+        return True, df_grouped
+
+    return True, pd.DataFrame()
 
 
 def _plot_data_rate(ax, start_time, df, label):
@@ -606,7 +621,7 @@ def plot_rtp_owd_pcap(ax, start_time, rtp_tx_df, rtp_rx_df):
     rtp_rx_latency_df = rtp_rx_df.copy()
     rtp_tx_latency_df['ts'] = rtp_tx_df.index
     rtp_rx_latency_df['ts'] = rtp_rx_df.index
-    return _plot_owd(ax, start_time, rtp_tx_latency_df, rtp_rx_latency_df, 'extseq', label='rtp')
+    return _plot_owd(ax, start_time, rtp_tx_latency_df, rtp_rx_latency_df, 'extseq', label='media')
 
 
 def get_rtp_owd_pcap_df(start_time, rtp_tx_df, rtp_rx_df):
@@ -860,7 +875,7 @@ def _plot_owd(ax, start_time, rtp_tx_latency_df, rtp_rx_latency_df, seq_nr_name,
         return False
     df = _merge_owd(start_time, rtp_tx_latency_df,
                     rtp_rx_latency_df, seq_nr_name)
-    ax.plot(df.index, df['latency'], label=label, linewidth=0.5, linestyle=':')
+    ax.plot(df.index, df['latency'], label=label, linewidth=0.5, linestyle='-')
     _plot_owd_settings(ax)
     return True
 
@@ -872,7 +887,7 @@ def _plot_owd_settings(ax):
     ax.xaxis.set_major_formatter(
         mticker.FuncFormatter(lambda x, pos: f'{x:.0f}s'))
     ax.yaxis.set_major_formatter(mticker.EngFormatter(unit='s'))
-    ax.grid(True, axis='y', linestyle='--', alpha=0.3)
+    # ax.grid(True, axis='y', linestyle='--', alpha=0.3)
     ax.legend(loc='upper right')
 
 
