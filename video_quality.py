@@ -10,9 +10,11 @@ import parsers
 def map_frames_sender_pipeline(tx_df):
     tx_before_enc = tx_df[tx_df['msg'] == 'encoder sink'].copy()
 
-    flow_ids = tx_before_enc['flow-id'].unique()
-    if len(flow_ids) > 1:
-        raise ValueError("Frame latency only supported for single RTP flow")
+    if 'flow-id' in tx_before_enc.columns:
+        flow_ids = tx_before_enc['flow-id'].unique()
+        if len(flow_ids) > 1:
+            raise ValueError(
+                "Frame latency only supported for single RTP flow")
 
     tx_mapping = tx_df[tx_df['msg'] == 'rtp to pts mapping'].copy()
     tx_frames = tx_df[tx_df['msg'] == 'encoder src'].copy()
@@ -168,8 +170,12 @@ def calculate_quality_metrics(ref_file, input_dir, out_dir):
     cam = cv2.VideoCapture(ref_file)
     fps = cam.get(cv2.CAP_PROP_FPS)
 
-    lost_frames = get_lost_frames(f'{input_dir}/sender.stderr.log',
-                                  f'{input_dir}/receiver.stderr.log')
+    try:
+        lost_frames = get_lost_frames(f'{input_dir}/sender.stderr.log',
+                                      f'{input_dir}/receiver.stderr.log')
+    except (KeyError):
+        print("Invalid log files")
+        return
 
     config = parsers.parse_json_log_no_convert(f'{input_dir}/config.json')
     duration = config['duration'][0]

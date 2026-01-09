@@ -77,13 +77,13 @@ def plot_rtp_rates_log(ax, start_time, cap_df, tx_df, rx_df):
 
 def _plot_rtp_send_rate_pcaps(ax, start_time, sender_ip, rtp_tx_df, name='tx'):
     rtp_tx_df = rtp_tx_df[rtp_tx_df['src'] == sender_ip].copy()
-    rtp_tx_df['rate'] = rtp_tx_df['length'] * 80
+    rtp_tx_df['rate'] = rtp_tx_df['length'] * 8
     return _plot_rate(ax, start_time, rtp_tx_df, name)
 
 
 def _plot_rtp_recv_rate_pcaps(ax, start_time, receiver_ip, rtp_rx_df, name='rx'):
     rtp_rx_df = rtp_rx_df[rtp_rx_df['dst'] == receiver_ip].copy()
-    rtp_rx_df['rate'] = rtp_rx_df['length'] * 80
+    rtp_rx_df['rate'] = rtp_rx_df['length'] * 8
     return _plot_rate(ax, start_time, rtp_rx_df, name)
 
 
@@ -114,10 +114,10 @@ def plot_quic_rates(ax, start_time, cap_df, tx_log_df, qlog_tx_df, qlog_rx_df):
     if quic_tx_latency_df.empty or quic_rx_latency_df.empty:
         return False
 
-    quic_tx_latency_df['rate'] = quic_tx_latency_df['data.raw.length'] * 80
+    quic_tx_latency_df['rate'] = quic_tx_latency_df['data.raw.payload_length'] * 8
     _plot_data_rate(ax, start_time, quic_tx_latency_df, 'tx')
 
-    quic_rx_latency_df['rate'] = quic_rx_latency_df['data.raw.length'] * 80
+    quic_rx_latency_df['rate'] = quic_rx_latency_df['data.raw.length'] * 8
     _plot_data_rate(ax, start_time, quic_rx_latency_df, 'rx')
 
     _rate_plot_ax_config(ax)
@@ -174,10 +174,6 @@ def plot_all_recv_rates(ax, start_time, cap_df, tx_df, rx_df):
 
 def plot_all_send_rates_pcaps(ax, start_time, cap_df, tx_df, rtp_tx_df, dtls_tx_df, config_df, only_flow_rates=False):
     plot_capacity(ax, start_time, cap_df)
-    if not only_flow_rates:
-        plot_target_rate(
-            ax, start_time, tx_df, event_name='NEW_TARGET_RATE', label='tr all')
-        plot_target_rate(ax, start_time, tx_df, label='tr media')
 
     sender_ip, _ = _get_ips_from_config(config_df)
 
@@ -188,39 +184,82 @@ def plot_all_send_rates_pcaps(ax, start_time, cap_df, tx_df, rtp_tx_df, dtls_tx_
 
     if not only_flow_rates:
         _plot_data_media_sum_rate(ax, data_df, media_df)
+
+    # if not only_flow_rates:
+    plot_target_rate(ax, start_time, tx_df, label='tr media')
+    plot_target_rate(
+        ax, start_time, tx_df, event_name='NEW_TARGET_RATE', label='tr all')
+
     _rate_plot_ax_config(ax)
     return True
 
 
-def plot_all_send_rates_pcaps_owd(axs, start_time, cap_df, tx_df, rtp_tx_df, rtp_rx_df, dtls_tx_df, config_df):
+def plot_all_send_rates_and_owd_pcaps_nodtls(axs, start_time, cap_df, tx_df, rtp_tx_df, rtp_rx_df, config_df):
+    return plot_all_send_rates_and_owd_pcaps(axs, start_time, cap_df, tx_df, rtp_tx_df, rtp_rx_df, pd.DataFrame(), config_df)
+
+
+def plot_all_send_rates_and_owd_pcaps(axs, start_time, cap_df, tx_df, rtp_tx_df, rtp_rx_df, dtls_tx_df, config_df):
     rate_plotted = plot_all_send_rates_pcaps(
         axs[0], start_time, cap_df, tx_df, rtp_tx_df, dtls_tx_df, config_df, only_flow_rates=True)
     owd_plotted = plot_rtp_owd_pcap(axs[1], start_time, rtp_tx_df, rtp_rx_df)
     return rate_plotted or owd_plotted
 
 
-def plot_rtp_quic_rates_owd(axs, start_time, cap_df, tx_log_df, rx_log_df, qlog_tx_df, qlog_rx_df):
+def plot_all_send_rates_and_loss_pcaps_nodtls(axs, start_time, cap_df, tx_df, rtp_tx_df, rtp_rx_df, config_df):
+    return plot_all_send_rates_and_loss_pcaps(axs, start_time, cap_df, tx_df, rtp_tx_df, rtp_rx_df, pd.DataFrame(), config_df)
+
+
+def plot_all_send_rates_and_loss_pcaps(axs, start_time, cap_df, tx_df, rtp_tx_df, rtp_rx_df, dtls_tx_df, config_df):
+    rate_plotted = plot_all_send_rates_pcaps(
+        axs[0], start_time, cap_df, tx_df, rtp_tx_df, dtls_tx_df, config_df, only_flow_rates=True)
+    loss_plotted = _plot_loss_count(
+        axs[1], start_time, rtp_tx_df, rtp_rx_df, 'extseq')
+    return rate_plotted or loss_plotted
+
+
+def plot_rtp_rates_and_owd_quic(axs, start_time, cap_df, tx_log_df, rx_log_df, qlog_tx_df, qlog_rx_df, roq_df):
     rate_plotted = plot_all_send_rates_qlog(
-        axs[0], start_time, cap_df, tx_log_df, rx_log_df, qlog_tx_df, only_flow_rates=True)
+        axs[0], start_time, cap_df, tx_log_df, rx_log_df, qlog_tx_df, roq_df, only_flow_rates=True)
     owd_plotted = _plot_qlog_owd_per_flow(
-        axs[1], start_time, qlog_tx_df, qlog_rx_df, rx_log_df)
+        axs[1], start_time, qlog_tx_df, qlog_rx_df, roq_df)
     return rate_plotted or owd_plotted
 
 
-def plot_quic_rates_owd(axs, start_time, cap_df, tx_log_df, rx_log_df, qlog_tx_df, qlog_rx_df):
-    plot_capacity(axs[0], start_time, cap_df)
+def plot_rtp_rates_and_loss_quic(axs, start_time, cap_df, tx_log_df, rx_log_df, qlog_tx_df, qlog_rx_df, roq_df):
+    rate_plotted = plot_all_send_rates_qlog(
+        axs[0], start_time, cap_df, tx_log_df, rx_log_df, qlog_tx_df, roq_df, only_flow_rates=True)
+    owd_plotted = _plot_rtp_loss_count_quic(
+        axs[1], start_time, qlog_tx_df, qlog_rx_df, roq_df)
+    return rate_plotted or owd_plotted
+
+
+def plot_send_rates_and_owd_quic(axs, start_time, cap_df, tx_log_df, rx_log_df, qlog_tx_df, qlog_rx_df):
+    rate_plotted = _plot_send_rate_quic(
+        axs[0], start_time, cap_df, tx_log_df, rx_log_df, qlog_tx_df, qlog_rx_df)
+    owd_plotted = plot_qlog_owd(axs[1], start_time, qlog_tx_df, qlog_rx_df)
+    return rate_plotted or owd_plotted
+
+
+def plot_send_rates_and_loss_quic(axs, start_time, cap_df, tx_log_df, rx_log_df, qlog_tx_df, qlog_rx_df):
+    rate_plotted = _plot_send_rate_quic(
+        axs[0], start_time, cap_df, tx_log_df, rx_log_df, qlog_tx_df, qlog_rx_df)
+    owd_plotted = _plot_loss_count_quic(
+        axs[1], start_time, qlog_tx_df, qlog_rx_df)
+    return rate_plotted or owd_plotted
+
+
+def _plot_send_rate_quic(ax, start_time, cap_df, tx_log_df, rx_log_df, qlog_tx_df, qlog_rx_df):
+    plot_capacity(ax, start_time, cap_df)
 
     quic_tx_latency_df = qlog_tx_df[qlog_tx_df['name']
                                     == 'transport:packet_sent'].copy()
     if quic_tx_latency_df.empty:
         return False
 
-    quic_tx_latency_df['rate'] = quic_tx_latency_df['data.raw.length'] * 80
-    _plot_data_rate(axs[0], start_time, quic_tx_latency_df, 'data')
-    _rate_plot_ax_config(axs[0])
-
-    owd_plotted = plot_qlog_owd(axs[1], start_time, qlog_tx_df, qlog_rx_df)
-    return owd_plotted
+    quic_tx_latency_df['rate'] = quic_tx_latency_df['data.raw.length'] * 8
+    _plot_data_rate(ax, start_time, quic_tx_latency_df, 'quic')
+    _rate_plot_ax_config(ax)
+    return True
 
 
 def plot_all_recv_rates_pcaps(ax, start_time, cap_df, tx_df, rtp_rx_df, dtls_rx_df, config_df):
@@ -240,36 +279,33 @@ def plot_all_recv_rates_pcaps(ax, start_time, cap_df, tx_df, rtp_rx_df, dtls_rx_
     return True
 
 
-def _plot_all_qlog_rates(ax, start_time, cap_df, tx_df, rx_df, quic_df, only_flow_rates=False):
+def _plot_all_qlog_rates(ax, start_time, cap_df, tx_df, rx_df, quic_df, roq_df, only_flow_rates=False):
     plot_capacity(ax, start_time, cap_df)
-
-    if not only_flow_rates:
-        plot_target_rate(
-            ax, start_time, tx_df, event_name='NEW_TARGET_RATE', label='tr all')
-        plot_target_rate(ax, start_time, tx_df, label='tr media')
 
     # get frames
     qlog_frames = _explode_qlog_frames(quic_df)
 
-    stream_mapping = rx_df[rx_df['msg'] == 'new uni stream']
-    if stream_mapping.empty:
+    roq_stream_mapping = roq_df[roq_df['name'] == 'roq:stream_opened']
+    if roq_stream_mapping.empty:
         return False
 
     # plot each RTP flow separately
-    rtp_streams_mapping = stream_mapping[stream_mapping['flowID'].isin(
+    rtp_streams_mapping = roq_stream_mapping[roq_stream_mapping['data.flow_id'].isin(
         _RTP_FOW_IDS)]
 
     if rtp_streams_mapping.empty:
         return False
 
     media_dfs = []
-    for flow_id in sorted(rtp_streams_mapping['flowID'].unique()):
-        flow_mapping = rtp_streams_mapping[rtp_streams_mapping['flowID'] == flow_id]
+    for flow_id in sorted(rtp_streams_mapping['data.flow_id'].unique()):
+        flow_mapping = rtp_streams_mapping[rtp_streams_mapping['data.flow_id'] == flow_id]
         rtp_tx = qlog_frames.merge(
-            flow_mapping, left_on='stream_id', right_on='streamID', suffixes=['', '_mapping'])
-        rtp_tx['rate'] = rtp_tx['length'] * 80
-        plotted, media_df = _plot_data_rate(
-            ax, start_time, rtp_tx, f'media flow {int(flow_id)}')
+            flow_mapping, left_on='stream_id', right_on='data.stream_id', suffixes=['', '_mapping'])
+        rtp_tx['rate'] = rtp_tx['length'] * 8
+        name = 'media'
+        if len(media_dfs) > 1:
+            name = f'media flow {int(flow_id)}'
+        plotted, media_df = _plot_data_rate(ax, start_time, rtp_tx, name)
         if plotted:
             media_dfs.append(media_df)
 
@@ -277,7 +313,8 @@ def _plot_all_qlog_rates(ax, start_time, cap_df, tx_df, rx_df, quic_df, only_flo
         return False
 
     # plot data stream
-    data_streams_mapping = stream_mapping[stream_mapping['flowID'] == 3]
+    dc_stream_mapping = rx_df[rx_df['msg'] == 'new dc stream']
+    data_streams_mapping = dc_stream_mapping[dc_stream_mapping['flowID'] == 3]
 
     data_df = pd.DataFrame()
     if not data_streams_mapping.empty:
@@ -285,7 +322,7 @@ def _plot_all_qlog_rates(ax, start_time, cap_df, tx_df, rx_df, quic_df, only_flo
             data_streams_mapping, left_on='stream_id', right_on='streamID', suffixes=['', '_mapping'])
 
         # length is length field of the frame
-        data_tx['rate'] = data_tx['length'] * 80
+        data_tx['rate'] = data_tx['length'] * 8
 
         _, data_df = _plot_data_rate(ax, start_time, data_tx, 'data')
 
@@ -294,6 +331,11 @@ def _plot_all_qlog_rates(ax, start_time, cap_df, tx_df, rx_df, quic_df, only_flo
         media_sum_df = pd.concat(media_dfs).groupby(
             level=0).sum(numeric_only=True)
         _plot_data_media_sum_rate(ax, data_df, media_sum_df)
+
+    # if not only_flow_rates:
+    plot_target_rate(ax, start_time, tx_df, label='tr media')
+    plot_target_rate(
+        ax, start_time, tx_df, event_name='NEW_TARGET_RATE', label='tr all')
 
     _rate_plot_ax_config(ax)
     return True
@@ -307,7 +349,7 @@ def _explode_qlog_frames(qlog_df):
         [frames_df.drop('data.frames', axis=1), frames_normalized], axis=1)
 
 
-def _plot_qlog_owd_per_flow(ax, start_time, qlog_tx_df, qlog_rx_df, rx_log_df):
+def _plot_qlog_owd_per_flow(ax, start_time, qlog_tx_df, qlog_rx_df, roq_df):
     quic_tx_latency_df = qlog_tx_df[qlog_tx_df['name']
                                     == 'transport:packet_sent'].copy()
     quic_rx_latency_df = qlog_rx_df[qlog_rx_df['name']
@@ -320,43 +362,47 @@ def _plot_qlog_owd_per_flow(ax, start_time, qlog_tx_df, qlog_rx_df, rx_log_df):
     tx_qlog_frames = _explode_qlog_frames(qlog_tx_df)
     rx_qlog_frames = _explode_qlog_frames(qlog_rx_df)
 
-    stream_mapping = rx_log_df[rx_log_df['msg'] == 'new uni stream']
+    stream_mapping = roq_df[roq_df['name'] == 'roq:stream_opened']
     if stream_mapping.empty:
         return False
 
     # plot each RTP flow separately
-    rtp_streams_mapping = stream_mapping[stream_mapping['flowID'].isin(
+    rtp_streams_mapping = stream_mapping[stream_mapping['data.flow_id'].isin(
         _RTP_FOW_IDS)]
 
-    for flow_id in sorted(rtp_streams_mapping['flowID'].unique()):
-        flow_mapping = rtp_streams_mapping[rtp_streams_mapping['flowID'] == flow_id]
+    flow_ids = rtp_streams_mapping['data.flow_id'].unique()
+    for flow_id in sorted(flow_ids):
+        flow_mapping = rtp_streams_mapping[rtp_streams_mapping['data.flow_id'] == flow_id]
         rtp_tx = tx_qlog_frames.merge(
-            flow_mapping, left_on='stream_id', right_on='streamID', suffixes=['', '_mapping'])
+            flow_mapping, left_on='stream_id', right_on='data.stream_id', suffixes=['', '_mapping'])
         rtp_rx = rx_qlog_frames.merge(
-            flow_mapping, left_on='stream_id', right_on='streamID', suffixes=['', '_mapping'])
+            flow_mapping, left_on='stream_id', right_on='data.stream_id', suffixes=['', '_mapping'])
         rtp_tx['ts'] = rtp_tx['time']
         rtp_rx['ts'] = rtp_rx['time']
 
+        name = 'media'
+        if len(flow_ids) > 1:
+            name = f'media flow {int(flow_id)}'
         _plot_owd(ax, start_time, rtp_tx, rtp_rx,
-                  'data.header.packet_number', label=f'media flow {int(flow_id)}')
+                  'data.header.packet_number', label=name)
 
     return True
 
 
-def plot_all_send_rates_qlog(ax, start_time, cap_df, tx_df, rx_df, qlog_tx_df, only_flow_rates=False):
+def plot_all_send_rates_qlog(ax, start_time, cap_df, tx_df, rx_df, qlog_tx_df, roq_df, only_flow_rates=False):
     quic_tx_df = qlog_tx_df[qlog_tx_df['name']
                             == 'transport:packet_sent'].copy()
     if quic_tx_df.empty:
         return False
-    return _plot_all_qlog_rates(ax, start_time, cap_df, tx_df, rx_df, quic_tx_df, only_flow_rates)
+    return _plot_all_qlog_rates(ax, start_time, cap_df, tx_df, rx_df, quic_tx_df, roq_df, only_flow_rates=only_flow_rates)
 
 
-def plot_all_recv_rates_qlog(ax, start_time, cap_df, tx_df, rx_df, qlog_rx_df):
+def plot_all_recv_rates_qlog(ax, start_time, cap_df, tx_df, rx_df, qlog_rx_df, roq_df):
     qlog_rx_df = qlog_rx_df[qlog_rx_df['name']
                             == 'transport:packet_received'].copy()
     if qlog_rx_df.empty:
         return False
-    return _plot_all_qlog_rates(ax, start_time, cap_df, tx_df, rx_df, qlog_rx_df)
+    return _plot_all_qlog_rates(ax, start_time, cap_df, tx_df, rx_df, qlog_rx_df, roq_df)
 
 
 def _rate_plot_ax_config(ax):
@@ -390,7 +436,7 @@ def plot_rtp_rate_logging(ax, start_time, df, label):
     df = df[df['msg'] == 'rtp packet'].copy()
     if df.empty:
         return False, df
-    df['rate'] = df['rtp-packet.payload-length'] * 80
+    df['rate'] = df['rtp-packet.payload-length'] * 8
     return _plot_data_rate(ax, start_time, df, label)
 
 
@@ -398,19 +444,33 @@ def plot_data_rate(ax, start_time, df, label, event_name='DataSource sent data')
     df = df[df['msg'] == event_name].copy()
     if df.empty:
         return False, df
-    df['rate'] = df['payload-length'] * 80
+    df['rate'] = df['payload-length'] * 8
     return _plot_data_rate(ax, start_time, df, label)
 
 
 def _plot_rate(ax, start_time, df, label):
     """time as index and rate as column"""
-    df = df.resample('100ms').sum(numeric_only=True).copy()
 
     df['second'] = (df.index - start_time).total_seconds()
-    df.set_index('second', inplace=True)
-    ax.plot(df.index, df['rate'], label=label, linewidth=0.5)
+    df['second'] = df['second'].astype(int)  # Round to nearest second
+    df_grouped = df.groupby('second')['rate'].sum().reset_index()
 
-    return True, df
+    # Only plot if there's data
+    if not df_grouped.empty:
+        # Fill in zeros
+        first_second = df_grouped['second'].min()
+        last_second = df_grouped['second'].max()
+        all_seconds = pd.DataFrame(
+            {'second': range(int(first_second), int(last_second) + 1)})
+        df_grouped = all_seconds.merge(df_grouped, on='second', how='left')
+        df_grouped['rate'] = df_grouped['rate'].fillna(0)
+
+        df_grouped.set_index('second', inplace=True)
+        ax.plot(df_grouped.index,
+                df_grouped['rate'], label=label, linewidth=0.5)
+        return True, df_grouped
+
+    return True, pd.DataFrame()
 
 
 def _plot_data_rate(ax, start_time, df, label):
@@ -418,31 +478,78 @@ def _plot_data_rate(ax, start_time, df, label):
     return _plot_rate(ax, start_time, df, label)
 
 
-def plot_rtp_loss_pcap(ax, start_time, rtp_tx_df, rtp_rx_df):
-    return _plot_rtp_loss(ax, start_time, rtp_tx_df, rtp_rx_df, 'extseq')
+def plot_rtp_loss_rate_pcap(ax, start_time, rtp_tx_df, rtp_rx_df):
+    return _plot_rtp_loss_rate(ax, start_time, rtp_tx_df, rtp_rx_df, 'extseq')
 
 
-def plot_rtp_loss_log(ax, start_time, rtp_tx_df, rtp_rx_df):
+def plot_rtp_loss_rate_log(ax, start_time, rtp_tx_df, rtp_rx_df):
     """rtp loss without jitter buffer"""
     rtp_tx_df = rtp_tx_df[rtp_tx_df['msg'] == 'rtp packet'].copy()
     rtp_rx_df = rtp_rx_df[rtp_rx_df['msg'] == 'rtp packet'].copy()
     if rtp_tx_df.empty:
         return False
 
-    return _plot_rtp_loss(ax, start_time, rtp_tx_df, rtp_rx_df, 'rtp-packet.sequence-number')
+    return _plot_rtp_loss_rate(ax, start_time, rtp_tx_df, rtp_rx_df, 'rtp-packet.sequence-number')
 
 
-def plot_rtp_full_loss_log(ax, start_time, rtp_tx_df, rtp_rx_df):
+def _plot_rtp_loss_count_quic(ax, start_time, qlog_tx_df, qlog_rx_df, roq_df):
+    """rtp loss without jitter buffer"""
+    quic_tx_df = qlog_tx_df[qlog_tx_df['name']
+                            == 'transport:packet_sent'].copy()
+    quic_rx_df = qlog_rx_df[qlog_rx_df['name']
+                            == 'transport:packet_received'].copy()
+
+    if quic_tx_df.empty or quic_rx_df.empty:
+        return False
+
+    stream_mapping = roq_df[roq_df['name'] == 'roq:stream_opened']
+    if stream_mapping.empty:
+        return False
+
+    # get flowID streamID mapping
+    rtp_streams_mapping = stream_mapping[stream_mapping['data.flow_id'].isin(
+        _RTP_FOW_IDS)]
+
+    if rtp_streams_mapping.empty:
+        return False
+
+    # explodes each frame in its own row
+    qlog_tx_frames = _explode_qlog_frames(qlog_tx_df)
+    qlog_rx_frames = _explode_qlog_frames(qlog_rx_df)
+
+    # select correct streamIDs and groupBy packet_number, so we do count packet loss and not each frame separately
+    qlog_tx_filtered = qlog_tx_frames[qlog_tx_frames['stream_id'].isin(
+        rtp_streams_mapping['data.stream_id'])].groupby('data.header.packet_number').first()
+    qlog_rx_filtered = qlog_rx_frames[qlog_rx_frames['stream_id'].isin(
+        rtp_streams_mapping['data.stream_id'])].groupby('data.header.packet_number').first()
+
+    return _plot_loss_count(ax, start_time, qlog_tx_filtered, qlog_rx_filtered, "data.header.packet_number")
+
+
+def _plot_loss_count_quic(ax, start_time, qlog_tx_df, qlog_rx_df):
+    """rtp loss without jitter buffer"""
+    quic_tx_df = qlog_tx_df[qlog_tx_df['name']
+                            == 'transport:packet_sent'].copy()
+    quic_rx_df = qlog_rx_df[qlog_rx_df['name']
+                            == 'transport:packet_received'].copy()
+
+    if quic_tx_df.empty or quic_rx_df.empty:
+        return False
+
+    return _plot_loss_count(ax, start_time, quic_tx_df, quic_rx_df, "data.header.packet_number")
+
+
+def plot_rtp_full_loss_rate_log(ax, start_time, rtp_tx_df, rtp_rx_df):
     """rtp loss with jitter buffer"""
     rtp_tx_df = rtp_tx_df[rtp_tx_df['msg'] == 'rtp to pts mapping'].copy()
     rtp_rx_df = rtp_rx_df[rtp_rx_df['msg'] == 'rtp to pts mapping'].copy()
     if rtp_tx_df.empty:
         return False
 
-    return _plot_rtp_loss(ax, start_time, rtp_tx_df, rtp_rx_df, 'unwrapped-sequence-number')
+    return _plot_rtp_loss_rate(ax, start_time, rtp_tx_df, rtp_rx_df, 'unwrapped-sequence-number')
 
 
-def _plot_rtp_loss(ax, start_time, rtp_tx_df, rtp_rx_df, seq_nr_name):
+def _plot_rtp_loss_rate(ax, start_time, rtp_tx_df, rtp_rx_df, seq_nr_name):
     if rtp_tx_df.empty:
         return False
     if rtp_rx_df.empty:
@@ -476,12 +583,61 @@ def _plot_rtp_loss(ax, start_time, rtp_tx_df, rtp_rx_df, seq_nr_name):
     return True
 
 
+def _plot_loss_count(ax, start_time, rtp_tx_df, rtp_rx_df, seq_nr_name):
+    if rtp_tx_df.empty:
+        return False
+    if rtp_rx_df.empty:
+        rtp_rx_df = pd.DataFrame(columns=rtp_tx_df.columns)
+
+    rtp_tx_df = rtp_tx_df.reset_index()
+    rtp_rx_df = rtp_rx_df.reset_index()
+    tx_df = rtp_tx_df[['time', seq_nr_name]]
+    rx_df = rtp_rx_df[['time', seq_nr_name]]
+    merged_df = pd.merge(tx_df, rx_df, on=seq_nr_name,
+                         how='left', indicator=True)
+    merged_df['tx'] = pd.to_datetime(merged_df['time_x'])
+    merged_df['second'] = merged_df['tx'].dt.floor('s')
+    merged_df['lost'] = merged_df['_merge'] == 'left_only'
+    merged_df = merged_df.groupby('second').agg(
+        sent=(seq_nr_name, 'count'),
+        lost=('lost', 'sum')
+    )
+
+    merged_df['second'] = (merged_df.index - start_time).total_seconds()
+    merged_df.set_index('second', inplace=True)
+
+    ax.plot(merged_df.index, merged_df['lost'], linewidth=0.5)
+    ax.set_xlabel('Time')
+    ax.set_ylabel('Lost packets')
+    ax.set_ylim(bottom=0)
+    ax.xaxis.set_major_formatter(
+        mticker.FuncFormatter(lambda x, pos: f'{x:.0f}s'))
+    ax.yaxis.set_major_formatter(mticker.StrMethodFormatter('{x:.0f}'))
+    return True
+
+
 def plot_rtp_owd_pcap(ax, start_time, rtp_tx_df, rtp_rx_df):
     rtp_tx_latency_df = rtp_tx_df.copy()
     rtp_rx_latency_df = rtp_rx_df.copy()
     rtp_tx_latency_df['ts'] = rtp_tx_df.index
     rtp_rx_latency_df['ts'] = rtp_rx_df.index
-    return _plot_owd(ax, start_time, rtp_tx_latency_df, rtp_rx_latency_df, 'extseq', label='rtp')
+    return _plot_owd(ax, start_time, rtp_tx_latency_df, rtp_rx_latency_df, 'extseq', label='media')
+
+
+def get_rtp_owd_pcap_df(start_time, rtp_tx_df, rtp_rx_df):
+    rtp_tx_latency_df = rtp_tx_df.copy()
+    rtp_rx_latency_df = rtp_rx_df.copy()
+    rtp_tx_latency_df['ts'] = rtp_tx_df.index
+    rtp_rx_latency_df['ts'] = rtp_rx_df.index
+    return _merge_owd(start_time, rtp_tx_latency_df, rtp_rx_latency_df, 'extseq')
+
+
+def plot_rtp_owd_pcap_cdf(ax, start_time, rtp_tx_df, rtp_rx_df):
+    df = get_rtp_owd_pcap_df(start_time, rtp_tx_df, rtp_rx_df)
+    ax.ecdf(df['latency'], label='rtp')
+    ax.set_xlabel("latency (ms)")
+    ax.set_ylabel("CDF")
+    return True
 
 
 def plot_dtls_owd(ax, start_time, dtls_tx_df, dtls_rx_df, config_df):
@@ -501,18 +657,21 @@ def plot_dtls_loss(ax, start_time, dtls_tx_df, dtls_rx_df, config_df):
     dtls_tx_latency_df = dtls_tx_df[dtls_tx_df['src'] == sender_ip].copy()
     dtls_rx_latency_df = dtls_rx_df[dtls_rx_df['dst'] == receiver_ip].copy()
 
-    return _plot_rtp_loss(ax, start_time, dtls_tx_latency_df, dtls_rx_latency_df, 'seq')
+    return _plot_rtp_loss_rate(ax, start_time, dtls_tx_latency_df, dtls_rx_latency_df, 'seq')
 
 
 def _plot_dlts_send_rate(ax, start_time, sender_ip, dtls_tx_df, name='tx'):
+    if dtls_tx_df.empty:
+        return False, pd.DataFrame()
+
     dtls_tx_df = dtls_tx_df[dtls_tx_df['src'] == sender_ip].copy()
-    dtls_tx_df['rate'] = dtls_tx_df['length'] * 80
+    dtls_tx_df['rate'] = dtls_tx_df['length'] * 8
     return _plot_rate(ax, start_time, dtls_tx_df, name)
 
 
 def _plot_dlts_recv_rate(ax, start_time, receiver_ip, dtls_rx_df, name='rx'):
     dtls_rx_df = dtls_rx_df[dtls_rx_df['dst'] == receiver_ip].copy()
-    dtls_rx_df['rate'] = dtls_rx_df['length'] * 80
+    dtls_rx_df['rate'] = dtls_rx_df['length'] * 8
     return _plot_rate(ax, start_time, dtls_rx_df, name)
 
 
@@ -543,8 +702,34 @@ def plot_qlog_owd(ax, start_time, qlog_tx_df, qlog_rx_df):
     return _plot_owd(ax, start_time, quic_tx_latency_df, quic_rx_latency_df, 'data.header.packet_number')
 
 
+def get_qlog_owd_df(start_time, qlog_tx_df, qlog_rx_df):
+    quic_tx_latency_df = qlog_tx_df[qlog_tx_df['name']
+                                    == 'transport:packet_sent'].copy()
+    quic_rx_latency_df = qlog_rx_df[qlog_rx_df['name']
+                                    == 'transport:packet_received'].copy()
+
+    if quic_tx_latency_df.empty or quic_rx_latency_df.empty:
+        return False, pd.DataFrame()
+
+    quic_tx_latency_df['ts'] = quic_tx_latency_df['time']
+    quic_rx_latency_df['ts'] = quic_rx_latency_df['time']
+    return True, _merge_owd(start_time, quic_tx_latency_df,
+                            quic_rx_latency_df,  'data.header.packet_number')
+
+
+def plot_qlog_owd_cdf(ax, start_time, qlog_tx_df, qlog_rx_df):
+    ok, df = get_qlog_owd_df(start_time, qlog_tx_df, qlog_rx_df)
+    if not ok:
+        return False
+
+    ax.ecdf(df['latency'], label='quic')
+    ax.set_xlabel("latency (ms)")
+    ax.set_ylabel("CDF")
+    return True
+
+
 def plot_rtp_owd_log_udp(ax, start_time, rtp_tx_df, rtp_rx_df, pcap_tx_df, pcap_rx_df, config_df):
-    """ for upp and webrtc transport"""
+    """ for udp and webrtc transport"""
 
     tx_mapping = rtp_tx_df[rtp_tx_df['msg'] == 'rtp to pts mapping'].copy()
     rx_mapping = rtp_rx_df[rtp_rx_df['msg'] == 'rtp to pts mapping'].copy()
@@ -616,9 +801,10 @@ def plot_rtp_owd_log_roq(ax, start_time, rtp_tx_df, rtp_rx_df, quic_tx_df):
     tx_mapping = rtp_tx_df[rtp_tx_df['msg'] == 'rtp to pts mapping'].copy()
     if tx_mapping.empty:
         return False
-    flow_ids = tx_mapping['flow-id'].unique()
-    if len(flow_ids) > 1:
-        return False
+    if 'flow-id' in tx_mapping.columns:
+        flow_ids = tx_mapping['flow-id'].unique()
+        if len(flow_ids) > 1:
+            return False
 
     rtp_tx_log = rtp_tx_df[rtp_tx_df['msg'] == 'rtp packet'].copy()
     rtp_rx_log = rtp_rx_df[rtp_rx_df['msg'] == 'rtp packet'].copy()
@@ -689,7 +875,7 @@ def _plot_owd(ax, start_time, rtp_tx_latency_df, rtp_rx_latency_df, seq_nr_name,
         return False
     df = _merge_owd(start_time, rtp_tx_latency_df,
                     rtp_rx_latency_df, seq_nr_name)
-    ax.plot(df.index, df['latency'], label=label, linewidth=0.5, linestyle=':')
+    ax.plot(df.index, df['latency'], label=label, linewidth=0.5, linestyle='-')
     _plot_owd_settings(ax)
     return True
 
@@ -701,7 +887,7 @@ def _plot_owd_settings(ax):
     ax.xaxis.set_major_formatter(
         mticker.FuncFormatter(lambda x, pos: f'{x:.0f}s'))
     ax.yaxis.set_major_formatter(mticker.EngFormatter(unit='s'))
-    ax.grid(True, axis='y', linestyle='--', alpha=0.3)
+    # ax.grid(True, axis='y', linestyle='--', alpha=0.3)
     ax.legend(loc='upper right')
 
 
@@ -973,30 +1159,51 @@ def plot_video_quality(ax, start_time, qm_df):
     return True
 
 
+def plot_video_quality_psnr_cdf(ax, _, qm_df):
+    ax.ecdf(qm_df["psnr_avg"], label="psnr avg")
+    ax.set_xlabel("PSNR")
+    ax.set_ylabel("CDF")
+    ax.set_ylim([0, 1])
+    ax.legend(loc='lower right')
+    return True
+
+
+def plot_video_quality_ssim_cdf(ax, _, qm_df):
+    ax.ecdf(qm_df["ssim_avg"], label="ssim avg")
+    ax.set_xlabel("SSIM")
+    ax.set_ylabel("CDF")
+    ax.set_ylim([0, 1])
+    ax.legend(loc='lower right')
+    return True
+
+
 def plot_video_rate(ax, start_time, rx_df):
     rx_data = rx_df[rx_df['msg'] == 'encoder src'].copy()
     if rx_data.empty:
         return False
 
-    flow_ids = sorted(rx_data['flow-id'].unique())
-
-    if len(flow_ids) == 1:
-        rx_data['rate'] = rx_data['length'] * 80
-        _plot_data_rate(ax, start_time, rx_data, 'video rate')
+    if 'flow-id' in rx_data.columns:
+        flow_ids = sorted(rx_data['flow-id'].unique())
+        if len(flow_ids) > 1:
+            # Plot each flow separately
+            for flow_id in flow_ids:
+                flow_data = rx_data[rx_data['flow-id'] == flow_id].copy()
+                flow_data['rate'] = flow_data['length'] * 8
+                _plot_data_rate(ax, start_time, flow_data,
+                                f'video rate flow {int(flow_id)}')
+        else:
+            rx_data['rate'] = rx_data['length'] * 8
+            _plot_data_rate(ax, start_time, rx_data, 'video rate')
     else:
-        # Plot each flow separately
-        for flow_id in flow_ids:
-            flow_data = rx_data[rx_data['flow-id'] == flow_id].copy()
-            flow_data['rate'] = flow_data['length'] * 80
-            _plot_data_rate(ax, start_time, flow_data,
-                            f'video rate flow {int(flow_id)}')
+        rx_data['rate'] = rx_data['length'] * 8
+        _plot_data_rate(ax, start_time, rx_data, 'video rate')
 
     _rate_plot_ax_config(ax)
     return True
 
 
-def plot_frame_size_dist(ax, start_time, rx_df):
-    rx_data = rx_df[rx_df['msg'] == 'encoder src'].copy()
+def plot_frame_size_dist(ax, start_time, tx_df):
+    rx_data = tx_df[tx_df['msg'] == 'encoder src'].copy()
     if rx_data.empty:
         return False
 
@@ -1022,8 +1229,8 @@ def plot_frame_size_dist(ax, start_time, rx_df):
     return True
 
 
-def plot_frame_size(ax, start_time, rx_df):
-    rx_data = rx_df[rx_df['msg'] == 'encoder src'].copy()
+def plot_frame_size(ax, start_time, tx_df):
+    rx_data = tx_df[tx_df['msg'] == 'encoder src'].copy()
     if rx_data.empty:
         return False
 
@@ -1040,4 +1247,15 @@ def plot_frame_size(ax, start_time, rx_df):
     ax.legend(loc='upper right')
     ax.grid(True, axis='y', linestyle='--', alpha=0.3)
 
+    return True
+
+
+def plot_frame_size_and_tr(axs, start_time, cap_df, tx_df, rx_df):
+    plot_capacity(axs[0], start_time, cap_df)
+    plot_target_rate(
+        axs[0], start_time, tx_df, label='tr all')
+
+    plot_frame_size(axs[1], start_time, tx_df)
+
+    _rate_plot_ax_config(axs[0])
     return True
