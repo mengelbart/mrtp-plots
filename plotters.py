@@ -728,7 +728,7 @@ def plot_qlog_owd_cdf(ax, start_time, qlog_tx_df, qlog_rx_df):
     return True
 
 
-def plot_rtp_owd_log_udp(ax, start_time, rtp_tx_df, rtp_rx_df, pcap_tx_df, pcap_rx_df, config_df):
+def plot_rtp_owd_log_udp(ax, start_time, rtp_tx_df, rtp_rx_df, pcap_tx_df, pcap_rx_df, config_df, stacked=True):
     """ for udp and webrtc transport"""
 
     tx_mapping = rtp_tx_df[rtp_tx_df['msg'] == 'rtp to pts mapping'].copy()
@@ -782,12 +782,19 @@ def plot_rtp_owd_log_udp(ax, start_time, rtp_tx_df, rtp_rx_df, pcap_tx_df, pcap_
     combined_df = combined_df.join(
         network_delay, how='inner', lsuffix='', rsuffix='_network')
 
-    ax.stackplot(combined_df['second'],
-                 combined_df['send_stack_delay'],
-                 combined_df['network_delay'],
-                 combined_df['recv_stack_delay'],
-                 labels=['send stack', 'network', 'recv stack'],
-                 alpha=0.7)
+    if stacked:
+        ax.stackplot(combined_df['second'],
+                     combined_df['send_stack_delay'],
+                     combined_df['network_delay'],
+                     combined_df['recv_stack_delay'],
+                     labels=['send stack', 'network', 'recv stack'],
+                     alpha=0.7)
+    else:
+        combined_df['total_latency'] = (combined_df['send_stack_delay'] +
+                                        combined_df['network_delay'] +
+                                        combined_df['recv_stack_delay'])
+        ax.plot(combined_df['second'], combined_df['total_latency'],
+                label='latency', linewidth=0.5)
 
     ax.legend()
 
@@ -795,7 +802,12 @@ def plot_rtp_owd_log_udp(ax, start_time, rtp_tx_df, rtp_rx_df, pcap_tx_df, pcap_
     return True
 
 
-def plot_rtp_owd_log_roq(ax, start_time, rtp_tx_df, rtp_rx_df, quic_tx_df):
+def plot_rtp_owd_log_udp_overall(ax, start_time, rtp_tx_df, rtp_rx_df, pcap_tx_df, pcap_rx_df, config_df):
+    return plot_rtp_owd_log_udp(ax, start_time, rtp_tx_df, rtp_rx_df,
+                                pcap_tx_df, pcap_rx_df, config_df, stacked=False)
+
+
+def plot_rtp_owd_log_roq(ax, start_time, rtp_tx_df, rtp_rx_df, quic_tx_df, stacked=True):
     """ for roq transport. quic_tx_df not used but makes sure it is only called for roq transport"""
 
     tx_mapping = rtp_tx_df[rtp_tx_df['msg'] == 'rtp to pts mapping'].copy()
@@ -850,16 +862,28 @@ def plot_rtp_owd_log_roq(ax, start_time, rtp_tx_df, rtp_rx_df, quic_tx_df):
     combined_df = combined_df.join(
         send_stack_delay, how='inner', lsuffix='_send', rsuffix='')
 
-    ax.stackplot(combined_df['second'],
-                 combined_df['send_stack_delay'],
-                 combined_df['net_quic_delay'],
-                 combined_df['recv_stack_delay'],
-                 labels=['send stack', 'quic stack + network', 'recv stack'],
-                 alpha=0.7)
+    if stacked:
+        ax.stackplot(combined_df['second'],
+                     combined_df['send_stack_delay'],
+                     combined_df['net_quic_delay'],
+                     combined_df['recv_stack_delay'],
+                     labels=['send stack', 'quic stack + network', 'recv stack'],
+                     alpha=0.7)
+    else:
+        combined_df['total_latency'] = (combined_df['send_stack_delay'] +
+                                        combined_df['net_quic_delay'] +
+                                        combined_df['recv_stack_delay'])
+        ax.plot(combined_df['second'], combined_df['total_latency'],
+                label='latency', linewidth=0.5)
 
     ax.legend()
     _plot_owd_settings(ax)
     return True
+
+
+def plot_rtp_owd_log_roq_overall(ax, start_time, rtp_tx_df, rtp_rx_df, quic_tx_df):
+    return plot_rtp_owd_log_roq(ax, start_time, rtp_tx_df,
+                                rtp_rx_df, quic_tx_df, stacked=False)
 
 
 def _merge_owd(start_time, rtp_tx_latency_df, rtp_rx_latency_df, seq_nr_name):

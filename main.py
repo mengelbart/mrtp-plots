@@ -53,12 +53,16 @@ plots = [
     # OWD
     ('Network OWD (RTP pcap)', plotters.plot_rtp_owd_pcap, 1, 1, ['ns4.rtp.feather',
      'ns1.rtp.feather'], 'rtp_owd.png'),
-    ('RTP OWD', plotters.plot_rtp_owd_log_udp, 1, 1, ['sender.stderr.feather',
-     'receiver.stderr.feather', 'ns4.rtp.feather', 'ns1.rtp.feather', 'config.feather'], 'rtp_owd_log.png'),
-    ('RTP OWD', plotters.plot_rtp_owd_log_roq, 1, 1, ['sender.stderr.feather',
-     'receiver.stderr.feather', 'sender.feather'], 'rtp_owd_quic.png'),
     ('Network OWD (QUIC qlog)', plotters.plot_qlog_owd, 1, 1, ['sender.feather',
      'receiver.feather'], 'quic_owd.png'),
+    ('RTP OWD', plotters.plot_rtp_owd_log_udp, 1, 1, ['sender.stderr.feather',
+     'receiver.stderr.feather', 'ns4.rtp.feather', 'ns1.rtp.feather', 'config.feather'], 'rtp_owd_log_stacked.png'),
+    ('RTP OWD', plotters.plot_rtp_owd_log_roq, 1, 1, ['sender.stderr.feather',
+     'receiver.stderr.feather', 'sender.feather'], 'rtp_owd_quic_stacked.png'),
+    ('RTP OWD', plotters.plot_rtp_owd_log_udp_overall, 1, 1, ['sender.stderr.feather',
+     'receiver.stderr.feather', 'ns4.rtp.feather', 'ns1.rtp.feather', 'config.feather'], 'rtp_owd_log.png'),
+    ('RTP OWD', plotters.plot_rtp_owd_log_roq_overall, 1, 1, ['sender.stderr.feather',
+     'receiver.stderr.feather', 'sender.feather'], 'rtp_owd_quic.png'),
 
     # DTLS
     ('DTLS OWD (pcap)', plotters.plot_dtls_owd, 1, 1, ['ns4.dtls.feather',
