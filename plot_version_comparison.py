@@ -12,8 +12,8 @@ FIG_DPI = 300
 
 predefined_plots = [
     # (name-of-plot, [(testcase, case-name), ...])
-    ("defaults", [("static_quic-rtp-nada-pacing", "roq"),
-     ("static_webrtc-rtp-nada-pacing", "webrtc")]),
+    ("defaults", [("static-5mbit-50ms_quic-rtp-dc-nada-pacing", "roq"),
+     ("static-5mbit-50ms_webrtc-rtp-dc-nada-pacing", "webrtc")]),
 ]
 
 
