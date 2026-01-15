@@ -313,18 +313,19 @@ def _plot_all_qlog_rates(ax, start_time, cap_df, tx_df, rx_df, quic_df, roq_df, 
         return False
 
     # plot data stream
-    dc_stream_mapping = rx_df[rx_df['msg'] == 'new dc stream']
-    data_streams_mapping = dc_stream_mapping[dc_stream_mapping['flowID'] == 3]
-
     data_df = pd.DataFrame()
-    if not data_streams_mapping.empty:
-        data_tx = qlog_frames.merge(
-            data_streams_mapping, left_on='stream_id', right_on='streamID', suffixes=['', '_mapping'])
+    dc_stream_mapping = rx_df[rx_df['msg'] == 'new dc stream']
+    if not dc_stream_mapping.empty:
+        data_streams_mapping = dc_stream_mapping[dc_stream_mapping['flowID'] == 3]
 
-        # length is length field of the frame
-        data_tx['rate'] = data_tx['length'] * 8
+        if not data_streams_mapping.empty:
+            data_tx = qlog_frames.merge(
+                data_streams_mapping, left_on='stream_id', right_on='streamID', suffixes=['', '_mapping'])
 
-        _, data_df = _plot_data_rate(ax, start_time, data_tx, 'data')
+            # length is length field of the frame
+            data_tx['rate'] = data_tx['length'] * 8
+
+            _, data_df = _plot_data_rate(ax, start_time, data_tx, 'data')
 
     # sum media rates across all RTP flows
     if not only_flow_rates:
