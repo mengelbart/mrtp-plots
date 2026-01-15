@@ -1283,3 +1283,40 @@ def plot_frame_size_and_tr(axs, start_time, cap_df, tx_df, rx_df):
 
     _rate_plot_ax_config(axs[0])
     return True
+
+
+def plot_file_completion(axs, start_time, tx_df, rx_df):
+    tx_df = tx_df[tx_df['msg'] == 'DataSrc Chunk started']
+    rx_df = rx_df[rx_df['msg'] == 'DataSink Chunk finished']
+
+    if tx_df.empty or rx_df.empty:
+        return False
+
+    merged_df = tx_df.merge(rx_df, on='chunk-number',
+                            suffixes=('_start', '_finish'))
+    if merged_df.empty:
+        return False
+
+    merged_df['completion_time'] = (
+        pd.to_datetime(merged_df['time_finish']) -
+        pd.to_datetime(merged_df['time_start'])
+    ) / datetime.timedelta(seconds=1)
+
+    avg_completion_time = merged_df['completion_time'].mean()
+    axs.axhline(y=avg_completion_time, color='red', linestyle='--', linewidth=1,
+               label=f'Avg: {avg_completion_time:.2f}s')
+
+    axs.bar(merged_df['chunk-number'], merged_df['completion_time'], width=0.5,
+            label='Chunk Completion Time')
+
+    # labels for bars
+    for i, (chunk_num, comp_time) in enumerate(zip(merged_df['chunk-number'], merged_df['completion_time'])):
+        axs.text(chunk_num, comp_time, f'{comp_time:.1f}s',
+                 ha='center', va='bottom', fontsize=9)
+
+    axs.set_xlabel('Chunk Number')
+    axs.set_ylabel('Completion Time (s)')
+    axs.yaxis.set_major_formatter(mticker.EngFormatter(unit='s'))
+    axs.legend(loc='upper right')
+
+    return True

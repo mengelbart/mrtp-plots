@@ -139,6 +139,10 @@ plots = [
     # plots for understanding the encoder behavior
     ('frame size + tr', plotters.plot_frame_size_and_tr, 2, 1, [
      'tc.feather', 'sender.stderr.feather', 'receiver.stderr.feather'], 'video_frame_tr.png'),
+
+    # other
+   ('completion time', plotters.plot_file_completion, 1, 1, [
+    'sender.stderr.feather', 'receiver.stderr.feather'], 'comp_time.png'),
 ]
 
 
