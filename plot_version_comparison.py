@@ -2,6 +2,7 @@ from pathlib import Path
 
 import matplotlib.pyplot as plt
 import matplotlib.ticker as mticker
+import numpy as np
 import pandas as pd
 import plotters
 import serializers
@@ -199,6 +200,68 @@ def plot_target_rate(name, cases, out):
     _save_rate_graph(ax, fig, image_name, legend, "Rate")
 
 
+def calc_comp_for_teste(case):
+    feather_sender = Path(case[1]) / Path("sender.stderr.feather")
+    feather_recv = Path(case[1]) / Path("receiver.stderr.feather")
+    if not feather_sender.is_file() or not feather_recv.is_file():
+        return [], False
+
+    tx_df = serializers.read_feather(feather_sender)
+    rx_df = serializers.read_feather(feather_recv)
+
+    tx_df = tx_df[tx_df['msg'] == 'DataSrc Chunk started']
+    rx_df = rx_df[rx_df['msg'] == 'DataSink Chunk finished']
+
+    if tx_df.empty or rx_df.empty:
+        return [], False
+
+    merged_df = tx_df.merge(rx_df, on='chunk-number',
+                            suffixes=('_start', '_finish'))
+    if merged_df.empty:
+        return [], False
+
+    merged_df['completion_time'] = (
+        pd.to_datetime(merged_df['time_finish']) -
+        pd.to_datetime(merged_df['time_start'])
+    )
+
+    return merged_df['completion_time'].to_numpy(), True
+
+
+def calc_comp_time(cases, out):
+    # Group cases by test type (case[0])
+    test_type_data = {}
+
+    for case in cases:
+        comp_times, ok = calc_comp_for_teste(case)
+        if ok:
+            test_type = case[0]
+            if test_type not in test_type_data:
+                test_type_data[test_type] = []
+            test_type_data[test_type].append(comp_times)
+
+    output_file = Path(out) / Path("completion-time.csv")
+    results = []
+
+    for test_type, comp_time_arrays in test_type_data.items():
+        combined = np.concatenate(comp_time_arrays)
+        # calculate average
+        avg_comp_time = combined.mean()
+        avg_seconds = avg_comp_time / pd.Timedelta(seconds=1)
+        num_tests = len(comp_time_arrays)
+        print(
+            f"{test_type}: avg completion time = {avg_seconds:.2f} seconds (n={num_tests})")
+        results.append({
+            'test_type': test_type,
+            'avg_completion_time_seconds': avg_seconds,
+            'num_tests': num_tests
+        })
+
+    if results:
+        df = pd.DataFrame(results)
+        df.to_csv(output_file, index=False)
+
+
 def plot_video_quality(plot_name, cases, out, name, plot_fct):
     legend = []
     image_name = Path(out) / Path(f"{plot_name}_{name}.png")
@@ -247,6 +310,10 @@ def _get_link_types(testcases):
     """Get all unique link types in testcase tuple list. Types: static, ..."""
     linktypes = [case[0].split("_")[0] for case in testcases]
     return set(linktypes)
+
+
+def calc_avgs(testcases, out):
+    calc_comp_time(testcases, out)
 
 
 def plot_by_testtype(testcases, out):
@@ -303,6 +370,10 @@ def get_all_testcases(dir: str):
                     testcases.append(testcase)
 
     return testcases
+
+
+def calc_avgs_comparision(input: str, output: str):
+    calc_avgs(get_all_testcases(input), output)
 
 
 def plot_link_comparision(input: str, output: str):
