@@ -68,7 +68,7 @@ def set_start_time_index(df, start_time, time_column):
 def plot_rtp_rates_log(ax, start_time, cap_df, tx_df, rx_df):
     """ plots rtp rates from logs"""
     plot_capacity(ax, start_time, cap_df)
-    plot_target_rate(ax, start_time, tx_df)
+    plot_target_rate(ax, start_time, tx_df, color='tab:green')
     plot_rtp_rate_logging(ax, start_time, tx_df, 'tx')
     plot_rtp_rate_logging(ax, start_time, rx_df, 'rx')
     _rate_plot_ax_config(ax)
@@ -90,7 +90,7 @@ def _plot_rtp_recv_rate_pcaps(ax, start_time, receiver_ip, rtp_rx_df, name='rx')
 def plot_rtp_rates_pcaps(ax, start_time, cap_df, tx_log_df, rtp_tx_df, rtp_rx_df, config_df):
     """plots rtp rates from pcaps"""
     plot_capacity(ax, start_time, cap_df)
-    plot_target_rate(ax, start_time, tx_log_df)
+    plot_target_rate(ax, start_time, tx_log_df, color='tab:green')
 
     sender_ip, receiver_ip = _get_ips_from_config(config_df)
     _plot_rtp_send_rate_pcaps(ax, start_time, sender_ip, rtp_tx_df)
@@ -104,7 +104,7 @@ def plot_quic_rates(ax, start_time, cap_df, tx_log_df, qlog_tx_df, qlog_rx_df):
     """plots quic rates from qlogs"""
 
     plot_capacity(ax, start_time, cap_df)
-    plot_target_rate(ax, start_time, tx_log_df)
+    plot_target_rate(ax, start_time, tx_log_df, color='tab:green')
 
     quic_tx_latency_df = qlog_tx_df[qlog_tx_df['name']
                                     == 'transport:packet_sent'].copy()
@@ -135,21 +135,19 @@ def _plot_data_media_sum_rate(ax, data_df, media_df):
     combined_df['rate'] = combined_df.get(
         'rate_data', 0) + combined_df.get('rate_media', 0)
     ax.plot(combined_df.index,
-            combined_df['rate'], label='total', linewidth=0.5)
+            combined_df['rate'], label='total', linewidth=0.5, color='tab:purple')
 
 
 def plot_all_send_rates(ax, start_time, cap_df, tx_df):
     plot_capacity(ax, start_time, cap_df)
     plot_target_rate(
-        ax, start_time, tx_df, event_name='NEW_TARGET_RATE', label='tr all')
-    plot_target_rate(ax, start_time, tx_df, label='tr media')
-    tx_data_plotted, data_df = plot_data_rate(ax, start_time, tx_df, 'data')
-
-    # only plot if data was sent
-    if not tx_data_plotted:
-        return False
+        ax, start_time, tx_df, event_name='NEW_TARGET_RATE', label='tr all', color='tab:green')
+    plot_target_rate(ax, start_time, tx_df,
+                     label='tr media', color='tab:red')
 
     _, media_df = plot_rtp_rate_logging(ax, start_time, tx_df, 'media')
+    _, data_df = plot_data_rate(ax, start_time, tx_df, 'data')
+
     _plot_data_media_sum_rate(ax, data_df, media_df)
     _rate_plot_ax_config(ax)
     return True
@@ -158,15 +156,12 @@ def plot_all_send_rates(ax, start_time, cap_df, tx_df):
 def plot_all_recv_rates(ax, start_time, cap_df, tx_df, rx_df):
     plot_capacity(ax, start_time, cap_df)
     plot_target_rate(
-        ax, start_time, tx_df, event_name='NEW_TARGET_RATE')
-    rx_plotted, data_df = plot_data_rate(
-        ax, start_time, rx_df, 'data', event_name='DataSink received data')
-
-    # only plot if data was sent
-    if not rx_plotted:
-        return False
+        ax, start_time, tx_df, event_name='NEW_TARGET_RATE', color='tab:green')
 
     _, media_df = plot_rtp_rate_logging(ax, start_time, rx_df, 'media')
+    _, data_df = plot_data_rate(
+        ax, start_time, rx_df, 'data', event_name='DataSink received data')
+
     _plot_data_media_sum_rate(ax, data_df, media_df)
     _rate_plot_ax_config(ax)
     return True
@@ -174,6 +169,10 @@ def plot_all_recv_rates(ax, start_time, cap_df, tx_df, rx_df):
 
 def plot_all_send_rates_pcaps(ax, start_time, cap_df, tx_df, rtp_tx_df, dtls_tx_df, config_df, only_flow_rates=False):
     plot_capacity(ax, start_time, cap_df)
+    plot_target_rate(ax, start_time, tx_df,
+                     label='tr media', color='tab:green')
+    plot_target_rate(
+        ax, start_time, tx_df, event_name='NEW_TARGET_RATE', label='tr all', color='tab:green')
 
     sender_ip, _ = _get_ips_from_config(config_df)
 
@@ -184,11 +183,6 @@ def plot_all_send_rates_pcaps(ax, start_time, cap_df, tx_df, rtp_tx_df, dtls_tx_
 
     if not only_flow_rates:
         _plot_data_media_sum_rate(ax, data_df, media_df)
-
-    # if not only_flow_rates:
-    plot_target_rate(ax, start_time, tx_df, label='tr media')
-    plot_target_rate(
-        ax, start_time, tx_df, event_name='NEW_TARGET_RATE', label='tr all')
 
     _rate_plot_ax_config(ax)
     return True
@@ -265,7 +259,7 @@ def _plot_send_rate_quic(ax, start_time, cap_df, tx_log_df, rx_log_df, qlog_tx_d
 def plot_all_recv_rates_pcaps(ax, start_time, cap_df, tx_df, rtp_rx_df, dtls_rx_df, config_df):
     plot_capacity(ax, start_time, cap_df)
     plot_target_rate(
-        ax, start_time, tx_df, event_name='NEW_TARGET_RATE')
+        ax, start_time, tx_df, event_name='NEW_TARGET_RATE', color='tab:green')
 
     _, receiver_ip = _get_ips_from_config(config_df)
 
@@ -281,6 +275,10 @@ def plot_all_recv_rates_pcaps(ax, start_time, cap_df, tx_df, rtp_rx_df, dtls_rx_
 
 def _plot_all_qlog_rates(ax, start_time, cap_df, tx_df, rx_df, quic_df, roq_df, only_flow_rates=False):
     plot_capacity(ax, start_time, cap_df)
+    # if not only_flow_rates:
+    plot_target_rate(
+        ax, start_time, tx_df, event_name='NEW_TARGET_RATE', label='tr all', color='tab:green')
+    plot_target_rate(ax, start_time, tx_df, label='tr media', color='tab:red')
 
     # get frames
     qlog_frames = _explode_qlog_frames(quic_df)
@@ -332,11 +330,6 @@ def _plot_all_qlog_rates(ax, start_time, cap_df, tx_df, rx_df, quic_df, roq_df, 
         media_sum_df = pd.concat(media_dfs).groupby(
             level=0).sum(numeric_only=True)
         _plot_data_media_sum_rate(ax, data_df, media_sum_df)
-
-    # if not only_flow_rates:
-    plot_target_rate(ax, start_time, tx_df, label='tr media')
-    plot_target_rate(
-        ax, start_time, tx_df, event_name='NEW_TARGET_RATE', label='tr all')
 
     _rate_plot_ax_config(ax)
     return True
@@ -424,12 +417,12 @@ def plot_capacity(ax, start_time, df):
                 label='capacity', linewidth=0.5, color="lightskyblue")
 
 
-def plot_target_rate(ax, start_time, df, event_name='NEW_TARGET_MEDIA_RATE', label='target'):
+def plot_target_rate(ax, start_time, df, event_name='NEW_TARGET_MEDIA_RATE', label='target', color='black'):
     df = df[df['msg'] == event_name].copy()
     if df.empty:
         return False
     df = set_start_time_index(df, start_time, 'time')
-    ax.plot(df.index, df['rate'], label=label, linewidth=0.5)
+    ax.plot(df.index, df['rate'], label=label, linewidth=0.5, color=color)
     return True
 
 
@@ -678,7 +671,7 @@ def _plot_dlts_recv_rate(ax, start_time, receiver_ip, dtls_rx_df, name='rx'):
 
 def plot_dtls_rates(ax, start_time, cap_df, tx_df, dtls_tx_df, dtls_rx_df, config_df):
     plot_capacity(ax, start_time, cap_df)
-    plot_target_rate(ax, start_time, tx_df)
+    plot_target_rate(ax, start_time, tx_df, color='tab:green')
 
     sender_ip, receiver_ip = _get_ips_from_config(config_df)
 
@@ -900,7 +893,8 @@ def _plot_owd(ax, start_time, rtp_tx_latency_df, rtp_rx_latency_df, seq_nr_name,
         return False
     df = _merge_owd(start_time, rtp_tx_latency_df,
                     rtp_rx_latency_df, seq_nr_name)
-    ax.plot(df.index, df['latency'], label=label, linewidth=0.5, linestyle='-')
+    ax.plot(df.index, df['latency'], label=label,
+            linewidth=0.5, linestyle='', marker=',')  # , markersize=1
     _plot_owd_settings(ax)
     return True
 
@@ -1278,7 +1272,7 @@ def plot_frame_size(ax, start_time, tx_df):
 def plot_frame_size_and_tr(axs, start_time, cap_df, tx_df, rx_df):
     plot_capacity(axs[0], start_time, cap_df)
     plot_target_rate(
-        axs[0], start_time, tx_df, label='tr all')
+        axs[0], start_time, tx_df, label='tr all', color='tab:green')
 
     plot_frame_size(axs[1], start_time, tx_df)
 
@@ -1305,7 +1299,7 @@ def plot_file_completion(axs, start_time, tx_df, rx_df):
 
     avg_completion_time = merged_df['completion_time'].mean()
     axs.axhline(y=avg_completion_time, color='red', linestyle='--', linewidth=1,
-               label=f'Avg: {avg_completion_time:.2f}s')
+                label=f'Avg: {avg_completion_time:.2f}s')
 
     axs.bar(merged_df['chunk-number'], merged_df['completion_time'], width=0.5,
             label='Chunk Completion Time')
