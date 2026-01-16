@@ -893,8 +893,7 @@ def _plot_owd(ax, start_time, rtp_tx_latency_df, rtp_rx_latency_df, seq_nr_name,
         return False
     df = _merge_owd(start_time, rtp_tx_latency_df,
                     rtp_rx_latency_df, seq_nr_name)
-    ax.plot(df.index, df['latency'], label=label,
-            linewidth=0.5, linestyle='', marker=',')  # , markersize=1
+    ax.plot(df.index, df['latency'], label=label, linewidth=0.5, linestyle='')
     _plot_owd_settings(ax)
     return True
 
