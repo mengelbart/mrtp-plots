@@ -127,7 +127,7 @@ def plot_quic_rates(ax, start_time, cap_df, tx_log_df, qlog_tx_df, qlog_rx_df):
 def _plot_data_media_sum_rate(ax, data_df, media_df):
     if data_df.empty:
         ax.plot(media_df.index,
-                media_df['rate'], label='total', linewidth=0.5)
+                media_df['rate'], label='Total', linewidth=0.5)
         return
 
     combined_df = data_df.join(
@@ -135,7 +135,7 @@ def _plot_data_media_sum_rate(ax, data_df, media_df):
     combined_df['rate'] = combined_df.get(
         'rate_data', 0) + combined_df.get('rate_media', 0)
     ax.plot(combined_df.index,
-            combined_df['rate'], label='total', linewidth=0.5, color='tab:purple')
+            combined_df['rate'], label='Total', linewidth=0.5, color='tab:purple')
 
 
 def plot_all_send_rates(ax, start_time, cap_df, tx_df):
@@ -145,8 +145,8 @@ def plot_all_send_rates(ax, start_time, cap_df, tx_df):
     plot_target_rate(ax, start_time, tx_df,
                      label='tr media', color='tab:red')
 
-    _, media_df = plot_rtp_rate_logging(ax, start_time, tx_df, 'media')
-    _, data_df = plot_data_rate(ax, start_time, tx_df, 'data')
+    _, media_df = plot_rtp_rate_logging(ax, start_time, tx_df, 'Media')
+    _, data_df = plot_data_rate(ax, start_time, tx_df, 'Data')
 
     _plot_data_media_sum_rate(ax, data_df, media_df)
     _rate_plot_ax_config(ax)
@@ -158,9 +158,9 @@ def plot_all_recv_rates(ax, start_time, cap_df, tx_df, rx_df):
     plot_target_rate(
         ax, start_time, tx_df, event_name='NEW_TARGET_RATE', color='tab:green')
 
-    _, media_df = plot_rtp_rate_logging(ax, start_time, rx_df, 'media')
+    _, media_df = plot_rtp_rate_logging(ax, start_time, rx_df, 'Media')
     _, data_df = plot_data_rate(
-        ax, start_time, rx_df, 'data', event_name='DataSink received data')
+        ax, start_time, rx_df, 'Data', event_name='DataSink received data')
 
     _plot_data_media_sum_rate(ax, data_df, media_df)
     _rate_plot_ax_config(ax)
@@ -177,9 +177,9 @@ def plot_all_send_rates_pcaps(ax, start_time, cap_df, tx_df, rtp_tx_df, dtls_tx_
     sender_ip, _ = _get_ips_from_config(config_df)
 
     _, media_df = _plot_rtp_send_rate_pcaps(
-        ax, start_time, sender_ip, rtp_tx_df, name='media')
+        ax, start_time, sender_ip, rtp_tx_df, name='Media')
     _, data_df = _plot_dlts_send_rate(
-        ax, start_time, sender_ip, dtls_tx_df, name='data')
+        ax, start_time, sender_ip, dtls_tx_df, name='Data')
 
     if not only_flow_rates:
         _plot_data_media_sum_rate(ax, data_df, media_df)
@@ -264,9 +264,9 @@ def plot_all_recv_rates_pcaps(ax, start_time, cap_df, tx_df, rtp_rx_df, dtls_rx_
     _, receiver_ip = _get_ips_from_config(config_df)
 
     _, data_df = _plot_dlts_recv_rate(
-        ax, start_time, receiver_ip, dtls_rx_df, name='data')
+        ax, start_time, receiver_ip, dtls_rx_df, name='Data')
     _, media_df = _plot_rtp_recv_rate_pcaps(
-        ax, start_time, receiver_ip, rtp_rx_df, name='media')
+        ax, start_time, receiver_ip, rtp_rx_df, name='Media')
 
     _plot_data_media_sum_rate(ax, data_df, media_df)
     _rate_plot_ax_config(ax)
@@ -300,7 +300,7 @@ def _plot_all_qlog_rates(ax, start_time, cap_df, tx_df, rx_df, quic_df, roq_df, 
         rtp_tx = qlog_frames.merge(
             flow_mapping, left_on='stream_id', right_on='data.stream_id', suffixes=['', '_mapping'])
         rtp_tx['rate'] = rtp_tx['length'] * 8
-        name = 'media'
+        name = 'Media'
         if len(media_dfs) > 1:
             name = f'media flow {int(flow_id)}'
         plotted, media_df = _plot_data_rate(ax, start_time, rtp_tx, name)
@@ -323,7 +323,7 @@ def _plot_all_qlog_rates(ax, start_time, cap_df, tx_df, rx_df, quic_df, roq_df, 
             # length is length field of the frame
             data_tx['rate'] = data_tx['length'] * 8
 
-            _, data_df = _plot_data_rate(ax, start_time, data_tx, 'data')
+            _, data_df = _plot_data_rate(ax, start_time, data_tx, 'Data')
 
     # sum media rates across all RTP flows
     if not only_flow_rates:
@@ -374,7 +374,7 @@ def _plot_qlog_owd_per_flow(ax, start_time, qlog_tx_df, qlog_rx_df, roq_df):
         rtp_tx['ts'] = rtp_tx['time']
         rtp_rx['ts'] = rtp_rx['time']
 
-        name = 'media'
+        name = 'Media'
         if len(flow_ids) > 1:
             name = f'media flow {int(flow_id)}'
         _plot_owd(ax, start_time, rtp_tx, rtp_rx,
@@ -615,7 +615,7 @@ def plot_rtp_owd_pcap(ax, start_time, rtp_tx_df, rtp_rx_df):
     rtp_rx_latency_df = rtp_rx_df.copy()
     rtp_tx_latency_df['ts'] = rtp_tx_df.index
     rtp_rx_latency_df['ts'] = rtp_rx_df.index
-    return _plot_owd(ax, start_time, rtp_tx_latency_df, rtp_rx_latency_df, 'extseq', label='media')
+    return _plot_owd(ax, start_time, rtp_tx_latency_df, rtp_rx_latency_df, 'extseq', label='Media')
 
 
 def get_rtp_owd_pcap_df(start_time, rtp_tx_df, rtp_rx_df):
@@ -893,7 +893,7 @@ def _plot_owd(ax, start_time, rtp_tx_latency_df, rtp_rx_latency_df, seq_nr_name,
         return False
     df = _merge_owd(start_time, rtp_tx_latency_df,
                     rtp_rx_latency_df, seq_nr_name)
-    ax.plot(df.index, df['latency'], label=label, linewidth=0.5, linestyle='')
+    ax.plot(df.index, df['latency'], label=label, linewidth=0.5, linestyle='-')
     _plot_owd_settings(ax)
     return True
 
