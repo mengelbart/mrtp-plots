@@ -13,8 +13,8 @@ FIG_DPI = 300
 
 predefined_plots = [
     # (name-of-plot, [(testcase, case-name), ...])
-    ("defaults", [("static-5mbit-50ms_quic-rtp-dc-nada-pacing", "roq"),
-     ("static-5mbit-50ms_webrtc-rtp-dc-nada-pacing", "webrtc")]),
+    ("defaults", [("static-5mbit-25ms_quic-rtp-dc-nada-pacing", "roq"),
+     ("static-5mbit-25ms_webrtc-rtp-dc-nada-pacing", "webrtc")]),
 ]
 
 
@@ -165,7 +165,8 @@ def plot_owd_boxplot(name, cases, out):
                 dfs.append(delay_df)
                 legend.append(case[2])
 
-    ax.boxplot([df['latency'] for df in dfs], tick_labels=legend)
+    ax.boxplot([df['latency'] for df in dfs], tick_labels=legend,
+               showfliers=False)
     ax.yaxis.set_major_formatter(
         mticker.FuncFormatter(lambda x, pos: f'{x*1000:.0f}'))
 
