@@ -13,8 +13,8 @@ FIG_DPI = 300
 
 predefined_plots = [
     # (name-of-plot, [(testcase, case-name), ...])
-    ("defaults", [("static-5mbit-25ms_quic-rtp-dc-nada-pacing", "roq"),
-     ("static-5mbit-25ms_webrtc-rtp-dc-nada-pacing", "webrtc")]),
+    ("defaults", [("static-5mbit-25ms_quic-rtp-dc-nada-pacing", "RoQ"),
+     ("static-5mbit-25ms_webrtc-rtp-dc-nada-pacing", "WebRTC")]),
 ]
 
 
@@ -171,7 +171,7 @@ def plot_owd_boxplot(name, cases, out):
         mticker.FuncFormatter(lambda x, pos: f'{x*1000:.0f}'))
 
     ax.set_ylabel("latency (ms)")
-    ax.set_title(image_name.name.split("/")[-1].replace(".png", ""))
+    # ax.set_title(image_name.name.split("/")[-1].replace(".png", ""))
 
     fig.tight_layout()
     fig.savefig(image_name, bbox_inches="tight")
