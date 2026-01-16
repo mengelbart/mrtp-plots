@@ -452,8 +452,8 @@ def _plot_rate(ax, start_time, df, label):
     # Only plot if there's data
     if not df_grouped.empty:
         # Fill in zeros
-        first_second = df_grouped['second'].min()
-        last_second = df_grouped['second'].max()
+        first_second = 0
+        last_second = max(df_grouped['second'].max(), 100)     
         all_seconds = pd.DataFrame(
             {'second': range(int(first_second), int(last_second) + 1)})
         df_grouped = all_seconds.merge(df_grouped, on='second', how='left')
