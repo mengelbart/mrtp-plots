@@ -444,27 +444,29 @@ def plot_data_rate(ax, start_time, df, label, event_name='DataSource sent data')
 
 def _plot_rate(ax, start_time, df, label):
     """time as index and rate as column"""
+    df = df.resample('500ms').sum(numeric_only=True).copy() # resample
+    df['rate'] = df['rate'] * 2 # convert rate
 
     df['second'] = (df.index - start_time).total_seconds()
-    df['second'] = df['second'].astype(int)  # Round to nearest second
-    df_grouped = df.groupby('second')['rate'].sum().reset_index()
+    df.set_index('second', inplace=True)
+    
+    # fill in zeros before min and after max
+    max_second = 100.0
+    if not df.empty:
+        min_second = df.index.min()
+        max_data_second = df.index.max()
+        
+        for s in range(0, int(min_second)):
+            df.loc[s] = 0
+        
+        for s in range(int(max_data_second) + 1, int(max_second) + 1):
+            df.loc[s] = 0
+        
+        df = df.sort_index()
+    
+    ax.plot(df.index, df['rate'], label=label, linewidth=0.5)
 
-    # Only plot if there's data
-    if not df_grouped.empty:
-        # Fill in zeros
-        first_second = 0
-        last_second = max(df_grouped['second'].max(), 100)     
-        all_seconds = pd.DataFrame(
-            {'second': range(int(first_second), int(last_second) + 1)})
-        df_grouped = all_seconds.merge(df_grouped, on='second', how='left')
-        df_grouped['rate'] = df_grouped['rate'].fillna(0)
-
-        df_grouped.set_index('second', inplace=True)
-        ax.plot(df_grouped.index,
-                df_grouped['rate'], label=label, linewidth=0.5)
-        return True, df_grouped
-
-    return True, pd.DataFrame()
+    return True, df
 
 
 def _plot_data_rate(ax, start_time, df, label):
