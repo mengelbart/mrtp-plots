@@ -404,11 +404,12 @@ def plot_all_recv_rates_qlog(ax, start_time, cap_df, tx_df, rx_df, qlog_rx_df, r
 def _rate_plot_ax_config(ax):
     # ax.set_ylim(bottom=0, top=6e6)
     ax.set_xlabel('Time')
-    ax.set_ylabel('Rate')
+    ax.set_ylabel('Rate (MBit/s)')
     ax.xaxis.set_major_formatter(
         mticker.FuncFormatter(lambda x, pos: f'{x:.0f}s'))
-    ax.yaxis.set_major_formatter(mticker.EngFormatter(unit='bit/s'))
-    ax.legend(loc='upper right')
+    ax.yaxis.set_major_formatter(
+        mticker.FuncFormatter(lambda x, pos: f'{x/1e6}'))
+    ax.legend(bbox_to_anchor=(0., 1.02, 1., .102), loc='lower left', ncols=4, mode="expand", borderaxespad=0.)
 
 
 def plot_capacity(ax, start_time, df):
@@ -906,12 +907,11 @@ def _plot_owd(ax, start_time, rtp_tx_latency_df, rtp_rx_latency_df, seq_nr_name,
 def _plot_owd_settings(ax):
     # ax.set_ylim(bottom=0, top=0.5)
     ax.set_xlabel('Time')
-    ax.set_ylabel('Latency')
+    ax.set_ylabel('Latency (ms)')
     ax.xaxis.set_major_formatter(
         mticker.FuncFormatter(lambda x, pos: f'{x:.0f}s'))
-    ax.yaxis.set_major_formatter(mticker.EngFormatter(unit='s'))
-    # ax.grid(True, axis='y', linestyle='--', alpha=0.3)
-    ax.legend(loc='upper right')
+    ax.yaxis.set_major_formatter(
+        mticker.FuncFormatter(lambda x, pos: f'{x*1000:.0f}'))
 
 
 def plot_scream_queue_delay(ax, start_time, df):
@@ -1159,7 +1159,7 @@ def plot_frame_latency(ax, start_time, tx_df, rx_df):
             linewidth=DEFAULT_LINE_WIDTH)
     # ax.set_ylim(bottom=0, top=0.5)
     ax.set_xlabel('Time')
-    ax.set_ylabel('Latency')
+    ax.set_ylabel('Latency (ms)')
     ax.xaxis.set_major_formatter(
         mticker.FuncFormatter(lambda x, pos: f'{x:.0f}s'))
     ax.yaxis.set_major_formatter(mticker.EngFormatter(unit='s'))
