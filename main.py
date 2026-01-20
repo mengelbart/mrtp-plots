@@ -15,6 +15,10 @@ import serializers
 import plot_version_comparison
 import video_quality
 
+import matplotlib
+
+matplotlib.rcParams.update({'font.size': 20})
+
 plots = [
     # RTP rates
     # ('RTP Rates (logging)', plotters.plot_rtp_rates_log, 1,1, [
