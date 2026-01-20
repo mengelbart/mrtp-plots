@@ -117,7 +117,7 @@ def plot_owd_cdf(name, cases, out):
 
     ax.legend(legend)
     ax.set_ylabel("CDF")
-    ax.set_xlabel("latency (ms)")
+    ax.set_xlabel("Latency (ms)")
     ax.set_title(image_name.name.split("/")[-1].replace(".png", ""))
     ax.xaxis.set_major_formatter(
         mticker.FuncFormatter(lambda x, pos: f'{x*1000:.0f}'))
