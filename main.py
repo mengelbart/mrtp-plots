@@ -243,13 +243,13 @@ async def plot_cmd(args):
                 ax if isinstance(ax, list) else [ax])
             for axis in axes:
                 if axis.get_legend() is not None:
-                    axis.legend(loc='upper right', fontsize='small')
+                    axis.legend(bbox_to_anchor=(0., 1.02, 1., .102), loc='lower left', ncols=4, mode="expand", borderaxespad=0.)
 
         else:
             ax.set_title(title)
         fig.autofmt_xdate()
         fig.tight_layout()
-        fig.subplots_adjust(hspace=0.3)
+        # fig.subplots_adjust(hspace=0.3)
         fig.savefig(Path(args.output) / Path(out_name), dpi=300)
         plt.close(fig)
 
