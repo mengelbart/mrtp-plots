@@ -5,6 +5,8 @@ import pandas as pd
 
 import video_quality
 
+DEFAULT_LINE_WIDTH = 1.0
+
 unit_multipliers = {
     'bit': 1,
     'kbit': 1_000,
@@ -127,7 +129,7 @@ def plot_quic_rates(ax, start_time, cap_df, tx_log_df, qlog_tx_df, qlog_rx_df):
 def _plot_data_media_sum_rate(ax, data_df, media_df):
     if data_df.empty:
         ax.plot(media_df.index,
-                media_df['rate'], label='Total', linewidth=0.5)
+                media_df['rate'], label='Total', linewidth=DEFAULT_LINE_WIDTH)
         return
 
     combined_df = data_df.join(
@@ -135,7 +137,7 @@ def _plot_data_media_sum_rate(ax, data_df, media_df):
     combined_df['rate'] = combined_df.get(
         'rate_data', 0) + combined_df.get('rate_media', 0)
     ax.plot(combined_df.index,
-            combined_df['rate'], label='Total', linewidth=0.5, color='tab:purple')
+            combined_df['rate'], label='Total', linewidth=DEFAULT_LINE_WIDTH, color='tab:purple')
 
 
 def plot_all_send_rates(ax, start_time, cap_df, tx_df):
@@ -414,7 +416,7 @@ def plot_capacity(ax, start_time, df):
         df['rate'] = df['bandwidth'].apply(parse_rate)
         df = set_start_time_index(df, start_time, 'time')
         ax.step(df.index, df['rate'], where='post',
-                label='capacity', linewidth=0.5, color="lightskyblue")
+                label='Bandwidth', linewidth=DEFAULT_LINE_WIDTH, color="grey")
 
 
 def plot_target_rate(ax, start_time, df, event_name='NEW_TARGET_MEDIA_RATE', label='target', color='black'):
@@ -422,7 +424,7 @@ def plot_target_rate(ax, start_time, df, event_name='NEW_TARGET_MEDIA_RATE', lab
     if df.empty:
         return False
     df = set_start_time_index(df, start_time, 'time')
-    ax.plot(df.index, df['rate'], label=label, linewidth=0.5, color=color)
+    ax.plot(df.index, df['rate'], label=label, linewidth=DEFAULT_LINE_WIDTH, color=color)
     return True
 
 
@@ -464,7 +466,7 @@ def _plot_rate(ax, start_time, df, label):
         
         df = df.sort_index()
     
-    ax.plot(df.index, df['rate'], label=label, linewidth=0.5)
+    ax.plot(df.index, df['rate'], label=label, linewidth=DEFAULT_LINE_WIDTH)
 
     return True, df
 
@@ -569,7 +571,8 @@ def _plot_rtp_loss_rate(ax, start_time, rtp_tx_df, rtp_rx_df, seq_nr_name):
     merged_df['second'] = (merged_df.index - start_time).total_seconds()
     merged_df.set_index('second', inplace=True)
 
-    ax.plot(merged_df.index, merged_df['loss_rate'], linewidth=0.5)
+    ax.plot(merged_df.index, merged_df['loss_rate'],
+            linewidth=DEFAULT_LINE_WIDTH)
     ax.set_xlabel('Time')
     ax.set_ylabel('Loss Rate')
     ax.set_ylim(bottom=0)
@@ -602,7 +605,7 @@ def _plot_loss_count(ax, start_time, rtp_tx_df, rtp_rx_df, seq_nr_name):
     merged_df['second'] = (merged_df.index - start_time).total_seconds()
     merged_df.set_index('second', inplace=True)
 
-    ax.plot(merged_df.index, merged_df['lost'], linewidth=0.5)
+    ax.plot(merged_df.index, merged_df['lost'], linewidth=DEFAULT_LINE_WIDTH)
     ax.set_xlabel('Time')
     ax.set_ylabel('Lost packets')
     ax.set_ylim(bottom=0)
@@ -790,7 +793,7 @@ def plot_rtp_owd_log_udp(ax, start_time, rtp_tx_df, rtp_rx_df, pcap_tx_df, pcap_
                                         combined_df['network_delay'] +
                                         combined_df['recv_stack_delay'])
         ax.plot(combined_df['second'], combined_df['total_latency'],
-                label='latency', linewidth=0.5)
+                label='latency', linewidth=DEFAULT_LINE_WIDTH)
 
     ax.legend()
 
@@ -870,7 +873,7 @@ def plot_rtp_owd_log_roq(ax, start_time, rtp_tx_df, rtp_rx_df, quic_tx_df, stack
                                         combined_df['net_quic_delay'] +
                                         combined_df['recv_stack_delay'])
         ax.plot(combined_df['second'], combined_df['total_latency'],
-                label='latency', linewidth=0.5)
+                label='latency', linewidth=DEFAULT_LINE_WIDTH)
 
     ax.legend()
     _plot_owd_settings(ax)
@@ -895,7 +898,7 @@ def _plot_owd(ax, start_time, rtp_tx_latency_df, rtp_rx_latency_df, seq_nr_name,
         return False
     df = _merge_owd(start_time, rtp_tx_latency_df,
                     rtp_rx_latency_df, seq_nr_name)
-    ax.plot(df.index, df['latency'], label=label, linewidth=0.5, linestyle='-')
+    ax.plot(df.index, df['latency'], label=label, linewidth=DEFAULT_LINE_WIDTH, linestyle='-')
     _plot_owd_settings(ax)
     return True
 
@@ -916,14 +919,15 @@ def plot_scream_queue_delay(ax, start_time, df):
     if df.empty:
         return False
     df = set_start_time_index(df, start_time, 'time')
-    ax.plot(df.index, df['queueDelay'], label='queueDelay', linewidth=0.5)
+    ax.plot(df.index, df['queueDelay'], label='queueDelay',
+            linewidth=DEFAULT_LINE_WIDTH)
     ax.plot(df.index, df['queueDelayMax'],
-            label='queueDelayMax', linewidth=0.5)
+            label='queueDelayMax', linewidth=DEFAULT_LINE_WIDTH)
     ax.plot(df.index, df['queueDelayMinAvg'],
-            label='queueDelayMinAvg', linewidth=0.5)
-    ax.plot(df.index, df['sRtt'], label='sRtt', linewidth=0.5)
+            label='queueDelayMinAvg', linewidth=DEFAULT_LINE_WIDTH)
+    ax.plot(df.index, df['sRtt'], label='sRtt', linewidth=DEFAULT_LINE_WIDTH)
     ax.plot(df.index, df['rtpQueueDelay'],
-            label='rtpQueueDelay', linewidth=0.5)
+            label='rtpQueueDelay', linewidth=DEFAULT_LINE_WIDTH)
     ax.set_xlabel('Time')
     ax.set_ylabel('Delay')
     ax.xaxis.set_major_formatter(
@@ -938,9 +942,9 @@ def plot_scream_cwnd(ax, start_time, df):
     if df.empty:
         return False
     df = set_start_time_index(df, start_time, 'time')
-    ax.plot(df.index, df['cwnd'], label='cwnd', linewidth=0.5)
+    ax.plot(df.index, df['cwnd'], label='cwnd', linewidth=DEFAULT_LINE_WIDTH)
     ax.plot(df.index, df['bytesInFlightLog'],
-            label='bytesInFlightLog', linewidth=0.5)
+            label='bytesInFlightLog', linewidth=DEFAULT_LINE_WIDTH)
     ax.set_xlabel('Time')
     ax.set_ylabel('Size')
     ax.xaxis.set_major_formatter(
@@ -959,7 +963,7 @@ def plot_gcc_rtt(ax, start_time, df):
     df = set_start_time_index(df, start_time, 'time')
     df['rtt'] = df['rtt']*1e-9
     df = df.dropna(subset=['rtt'])
-    ax.plot(df.index, df['rtt'], label='RTT', linewidth=0.5)
+    ax.plot(df.index, df['rtt'], label='RTT', linewidth=DEFAULT_LINE_WIDTH)
     ax.set_xlabel('Time')
     ax.set_ylabel('Size')
     ax.xaxis.set_major_formatter(
@@ -977,9 +981,11 @@ def plot_gcc_target_rates(ax, start_time, df):
         return False
     df = df.dropna(subset=['loss-target', 'delay-target', 'target'])
     df = set_start_time_index(df, start_time, 'time')
-    ax.plot(df.index, df['loss-target'], label='loss-target', linewidth=0.5)
-    ax.plot(df.index, df['delay-target'], label='delay-target', linewidth=0.5)
-    ax.plot(df.index, df['target'], label='target', linewidth=0.5)
+    ax.plot(df.index, df['loss-target'], label='loss-target',
+            linewidth=DEFAULT_LINE_WIDTH)
+    ax.plot(df.index, df['delay-target'], label='delay-target',
+            linewidth=DEFAULT_LINE_WIDTH)
+    ax.plot(df.index, df['target'], label='target', linewidth=DEFAULT_LINE_WIDTH)
     ax.set_xlabel('Time')
     ax.set_ylabel('Rate')
     ax.xaxis.set_major_formatter(
@@ -1000,10 +1006,13 @@ def plot_gcc_estimates(ax, start_time, df):
     df['estimate'] = df['estimate'] * 60
     df = df.dropna(subset=['estimate', 'threshold'])
     ax.plot(df.index, df['interGroupDelay'],
-            label='interGroupDelay', linewidth=0.5)
-    ax.plot(df.index, df['estimate'], label='estimate', linewidth=0.5)
-    ax.plot(df.index, df['threshold'], label='threshold', linewidth=0.5)
-    ax.plot(df.index, -df['threshold'], label='-threshold', linewidth=0.5)
+            label='interGroupDelay', linewidth=DEFAULT_LINE_WIDTH)
+    ax.plot(df.index, df['estimate'], label='estimate',
+            linewidth=DEFAULT_LINE_WIDTH)
+    ax.plot(df.index, df['threshold'], label='threshold',
+            linewidth=DEFAULT_LINE_WIDTH)
+    ax.plot(df.index, -df['threshold'], label='-threshold',
+            linewidth=DEFAULT_LINE_WIDTH)
     ax.set_xlabel('Time')
     ax.set_ylabel('Time')
     ax.xaxis.set_major_formatter(
@@ -1022,8 +1031,10 @@ def plot_gcc_usage_and_state(ax, start_time, df):
     df = set_start_time_index(df, start_time, 'time')
     df = df.dropna(subset=['usage', 'state'])
     df['usage'] = -df['usage']
-    ax.step(df.index, df['usage'], where='post', label='usage', linewidth=0.5)
-    ax.step(df.index, df['state'], where='post', label='state', linewidth=0.5)
+    ax.step(df.index, df['usage'], where='post', label='usage',
+            linewidth=DEFAULT_LINE_WIDTH)
+    ax.step(df.index, df['state'], where='post', label='state',
+            linewidth=DEFAULT_LINE_WIDTH)
     ax.set_xlabel('Time')
     ax.xaxis.set_major_formatter(
         mticker.FuncFormatter(lambda x, pos: f'{x:.0f}s'))
@@ -1043,7 +1054,7 @@ def plot_sctp_stats(ax, start_time, df):
 
     df = set_start_time_index(df, start_time, 'time')
     ax.step(df.index, df['cwnd'], where='post',
-            label='sctp cwnd', linewidth=0.5)
+            label='sctp cwnd', linewidth=DEFAULT_LINE_WIDTH)
     ax.set_xlabel('Time')
     ax.set_ylabel('Size')
     ax.xaxis.set_major_formatter(
@@ -1144,7 +1155,8 @@ def plot_frame_latency(ax, start_time, tx_df, rx_df):
         datetime.timedelta(milliseconds=1) / 1000.0
 
     df = set_start_time_index(grouped_df, start_time, 'time_ori')
-    ax.plot(df.index, df['latency'], label='Latency', linewidth=0.5)
+    ax.plot(df.index, df['latency'], label='Latency',
+            linewidth=DEFAULT_LINE_WIDTH)
     # ax.set_ylim(bottom=0, top=0.5)
     ax.set_xlabel('Time')
     ax.set_ylabel('Latency')
