@@ -21,7 +21,6 @@ usage_and_state = {
 }
 
 _RTP_FOW_IDS = {0, 10, 20}
-_DATA_FOW_IDS = {3}
 
 
 def parse_rate(rate_str):
