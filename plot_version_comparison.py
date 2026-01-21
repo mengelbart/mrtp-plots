@@ -1,4 +1,5 @@
 from pathlib import Path
+from webbrowser import get
 
 import matplotlib.pyplot as plt
 import matplotlib.ticker as mticker
@@ -127,6 +128,134 @@ def plot_owd_cdf(name, cases, out):
     plt.close()
 
 
+def _get_owd_df(case):
+    """Returns delay df and ok bool"""
+    start_time = _get_start_time(case[1])
+
+    # pcap owd
+    rtp_pcap_tx = Path(case[1]) / Path('ns4.rtp.feather')
+    rtp_pcap_rx = Path(case[1]) / Path('ns1.rtp.feather')
+
+    if rtp_pcap_tx.is_file() and rtp_pcap_rx.is_file():
+        rtp_pcap_tx_df = serializers.read_feather(rtp_pcap_tx)
+        rtp_pcap_rx_df = serializers.read_feather(rtp_pcap_rx)
+
+        df = plotters.get_rtp_owd_pcap_df(
+            start_time, rtp_pcap_tx_df, rtp_pcap_rx_df)
+        return df, True
+
+    # quic owd TODO: also only rtp owd?
+    qlog_tx_feather = Path(case[1]) / Path("sender.feather")
+    qlog_rx_feater = Path(case[1]) / Path("receiver.feather")
+
+    if qlog_tx_feather.is_file() and qlog_rx_feater.is_file():
+        qlog_tx_df = serializers.read_feather(qlog_tx_feather)
+        qlog_rx_df = serializers.read_feather(qlog_rx_feater)
+
+        ok, delay_df = plotters.get_qlog_owd_df(
+            start_time, qlog_tx_df, qlog_rx_df)
+        if ok:
+            return delay_df, True
+
+    return pd.DataFrame(), False
+
+
+def _convert_bandwidth_to_bps(bandwidth_str):
+    """convert bw string to bps"""
+    units = {
+        'gbit': 1_000_000_000,
+        'mbit': 1_000_000,
+        'kbit': 1_000,
+        'bit': 1,
+    }
+    for unit in units:
+        if bandwidth_str.endswith(unit):
+            value = float(bandwidth_str[:-len(unit)])
+            return int(value * units[unit])
+    raise ValueError(f"Unknown bandwidth unit in '{bandwidth_str}'")
+
+
+def _get_utilization_df(case, util_of_rtp=True):
+    """Returns util data and ok bool. If util_of_rtp == True: RTP util, else data util"""
+
+    tc_feather = Path(case[1]) / Path("tc.feather")
+    if not tc_feather.is_file():
+        return pd.DataFrame(), False
+
+    tc_df = serializers.read_feather(tc_feather)
+
+    tc_df = tc_df.set_index(pd.DatetimeIndex(tc_df.index))
+    tc_df['bandwidth_bps'] = tc_df['bandwidth'].apply(
+        _convert_bandwidth_to_bps)
+    capacity_series = tc_df['bandwidth_bps'].resample('1s').ffill()
+
+    # pcap util
+    rtp_pcap_tx = Path(case[1]) / Path('ns4.rtp.feather')
+    if not util_of_rtp:
+        rtp_pcap_tx = Path(case[1]) / Path('ns4.dtls.feather')
+
+    if rtp_pcap_tx.is_file():
+        rtp_pcap_tx_df = serializers.read_feather(rtp_pcap_tx)
+        rtp_pcap_tx_df['rate'] = rtp_pcap_tx_df['length'] * 8
+
+        rtp_pcap_tx_df = rtp_pcap_tx_df.set_index(
+            pd.DatetimeIndex(rtp_pcap_tx_df.index))  # TODO
+        df = rtp_pcap_tx_df.resample('1s')['rate'].sum().to_frame()
+
+        # calc utilization
+        df['capacity'] = capacity_series.reindex(df.index, method='ffill')
+        df['utilization'] = df['rate'] / df['capacity']
+
+        return df, True
+
+    qlog_tx_feather = Path(case[1]) / Path("sender.feather")
+    roq_df_feather = Path(case[1]) / Path("sender.roq.feather")
+
+    # qlog util
+    if qlog_tx_feather.is_file() and roq_df_feather.is_file():
+        qlog_tx_df = serializers.read_feather(qlog_tx_feather)
+        roq_df = serializers.read_feather(roq_df_feather)
+
+        # get frames
+        qlog_frames = plotters._explode_qlog_frames(qlog_tx_df)
+
+        roq_stream_mapping = roq_df[roq_df['name'] == 'roq:stream_opened']
+        if roq_stream_mapping.empty:
+            return pd.DataFrame(), False
+
+        rtp_streams_mapping = roq_stream_mapping[roq_stream_mapping['data.flow_id'].isin(
+            plotters._RTP_FOW_IDS)]
+
+        if not util_of_rtp:
+            raise NotImplementedError(
+                "Data utilization for qlog not yet implemented")
+
+        if rtp_streams_mapping.empty:
+            return pd.DataFrame(), False
+
+        all_rtp_flows = []
+        for flow_id in sorted(rtp_streams_mapping['data.flow_id'].unique()):
+            flow_mapping = rtp_streams_mapping[rtp_streams_mapping['data.flow_id'] == flow_id]
+            rtp_tx = qlog_frames.merge(
+                flow_mapping, left_on='stream_id', right_on='data.stream_id', suffixes=['', '_mapping'])
+            rtp_tx['rate'] = rtp_tx['length'] * 8
+            all_rtp_flows.append(rtp_tx)
+
+        if all_rtp_flows:
+            combined_rtp = pd.concat(all_rtp_flows, ignore_index=True)
+
+            combined_rtp = combined_rtp.set_index(
+                pd.DatetimeIndex(combined_rtp['time']))
+            df = combined_rtp.resample('1s')['rate'].sum().to_frame()
+
+            df['capacity'] = capacity_series.reindex(df.index, method='ffill')
+            df['utilization'] = df['rate'] / df['capacity']
+
+            return df, True
+
+    return pd.DataFrame(), False
+
+
 def plot_owd_boxplot(name, cases, out):
     legend = []
     dfs = []
@@ -135,35 +264,10 @@ def plot_owd_boxplot(name, cases, out):
     fig, ax = plt.subplots(dpi=FIG_DPI, figsize=FIG_SIZE)
 
     for case in cases:
-        start_time = _get_start_time(case[1])
-
-        # pcap owd
-        rtp_pcap_tx = Path(case[1]) / Path('ns4.rtp.feather')
-        rtp_pcap_rx = Path(case[1]) / Path('ns1.rtp.feather')
-
-        if rtp_pcap_tx.is_file() and rtp_pcap_rx.is_file():
-            rtp_pcap_tx_df = serializers.read_feather(rtp_pcap_tx)
-            rtp_pcap_rx_df = serializers.read_feather(rtp_pcap_rx)
-
-            df = plotters.get_rtp_owd_pcap_df(
-                start_time, rtp_pcap_tx_df, rtp_pcap_rx_df)
-            dfs.append(df)
+        df, ok = _get_owd_df(case)
+        if ok:
             legend.append(case[2])
-            continue
-
-        # quic owd TODO: also only rtp owd?
-        qlog_tx_feather = Path(case[1]) / Path("sender.feather")
-        qlog_rx_feater = Path(case[1]) / Path("receiver.feather")
-
-        if qlog_tx_feather.is_file() and qlog_rx_feater.is_file():
-            qlog_tx_df = serializers.read_feather(qlog_tx_feather)
-            qlog_rx_df = serializers.read_feather(qlog_rx_feater)
-
-            ok, delay_df = plotters.get_qlog_owd_df(
-                start_time, qlog_tx_df, qlog_rx_df)
-            if ok:
-                dfs.append(delay_df)
-                legend.append(case[2])
+            dfs.append(df)
 
     ax.boxplot([df['latency'] for df in dfs], tick_labels=legend,
                showfliers=False)
@@ -201,7 +305,7 @@ def plot_target_rate(name, cases, out):
     _save_rate_graph(ax, fig, image_name, legend, "Rate")
 
 
-def calc_comp_for_teste(case):
+def calc_comp_for_test(case):
     feather_sender = Path(case[1]) / Path("sender.stderr.feather")
     feather_recv = Path(case[1]) / Path("receiver.stderr.feather")
     if not feather_sender.is_file() or not feather_recv.is_file():
@@ -229,20 +333,27 @@ def calc_comp_for_teste(case):
     return merged_df['completion_time'].to_numpy(), True
 
 
-def calc_comp_time(cases, out):
+def _combine_same_tests(cases, avg_fct):
     # Group cases by test type (case[0])
     test_type_data = {}
-
     for case in cases:
-        comp_times, ok = calc_comp_for_teste(case)
+        comp_times, ok = avg_fct(case)
         if ok:
             test_type = case[0]
             if test_type not in test_type_data:
                 test_type_data[test_type] = []
             test_type_data[test_type].append(comp_times)
 
+    return test_type_data
+
+
+def calc_avg_comp_time(cases, out):
+    # Group cases by test type (case[0])
+    test_type_data = _combine_same_tests(cases, calc_comp_for_test)
+
     output_file = Path(out) / Path("completion-time.csv")
     results = []
+    print("Average Completion Time Statistics:")
 
     for test_type, comp_time_arrays in test_type_data.items():
         combined = np.concatenate(comp_time_arrays)
@@ -251,10 +362,80 @@ def calc_comp_time(cases, out):
         avg_seconds = avg_comp_time / pd.Timedelta(seconds=1)
         num_tests = len(comp_time_arrays)
         print(
-            f"{test_type}: avg completion time = {avg_seconds:.2f} seconds (n={num_tests})")
+            f"{test_type}: avg completion time = {avg_seconds:.2f} seconds (N={num_tests})")
         results.append({
             'test_type': test_type,
             'avg_completion_time_seconds': avg_seconds,
+            'num_tests': num_tests
+        })
+
+    if results:
+        df = pd.DataFrame(results)
+        df.to_csv(output_file, index=False)
+
+
+def calc_avg_delay(cases, out):
+    # Group cases by test type (case[0])
+    test_type_data = _combine_same_tests(cases, _get_owd_df)
+
+    output_file = Path(out) / Path("delay.csv")
+    results = []
+    print("Average Delay Statistics:")
+
+    for test_type, delay_dfs in test_type_data.items():
+        combined = np.concatenate([df['latency'].to_numpy()
+                                  for df in delay_dfs])
+
+        # Calculate statistics
+        avg_delay = combined.mean() * 1000
+        median_delay = np.median(combined) * 1000
+        p99_delay = np.percentile(combined, 99) * 1000
+        num_tests = len(delay_dfs)
+
+        print(
+            f"{test_type}: avg delay = {avg_delay:.2f} ms, "
+            f"median = {median_delay:.2f} ms, "
+            f"99th percentile = {p99_delay:.2f} ms (N={num_tests})")
+
+        results.append({
+            'test_type': test_type,
+            'avg_delay_ms': avg_delay,
+            'median_delay_ms': median_delay,
+            'p99_delay_ms': p99_delay,
+            'num_tests': num_tests
+        })
+
+    if results:
+        df = pd.DataFrame(results)
+        df.to_csv(output_file, index=False)
+
+
+def calc_util(cases, out):
+    # Group cases by test type (case[0])
+    test_type_data = _combine_same_tests(cases, _get_utilization_df)
+
+    output_file = Path(out) / Path("util.csv")
+    results = []
+    print("Average Utilization Statistics:")
+
+    for test_type, delay_dfs in test_type_data.items():
+        combined = np.concatenate([df['utilization'].to_numpy()
+                                  for df in delay_dfs])
+
+        # Calculate statistics
+        avg_util = combined.mean() * 100
+        median_util = np.median(combined) * 100
+        num_tests = len(delay_dfs)
+
+        print(
+            f"{test_type}: avg utilization = {avg_util:.2f} %, "
+            f"median = {median_util:.2f} %, "
+            f"(N={num_tests})")
+
+        results.append({
+            'test_type': test_type,
+            'avg_utilization': avg_util,
+            'median_utilization': median_util,
             'num_tests': num_tests
         })
 
@@ -314,7 +495,9 @@ def _get_link_types(testcases):
 
 
 def calc_avgs(testcases, out):
-    calc_comp_time(testcases, out)
+    calc_avg_comp_time(testcases, out)
+    calc_avg_delay(testcases, out)
+    calc_util(testcases, out)
 
 
 def plot_by_testtype(testcases, out):
