@@ -1,5 +1,4 @@
 from pathlib import Path
-from webbrowser import get
 
 import matplotlib.pyplot as plt
 import matplotlib.ticker as mticker
@@ -175,7 +174,7 @@ def _convert_bandwidth_to_bps(bandwidth_str):
     raise ValueError(f"Unknown bandwidth unit in '{bandwidth_str}'")
 
 
-def _get_utilization_df(case, util_of_rtp=True):
+def _get_utilization_df(case):
     """Returns util data and ok bool. If util_of_rtp == True: RTP util, else data util"""
 
     tc_feather = Path(case[1]) / Path("tc.feather")
@@ -191,8 +190,6 @@ def _get_utilization_df(case, util_of_rtp=True):
 
     # pcap util
     rtp_pcap_tx = Path(case[1]) / Path('ns4.rtp.feather')
-    if not util_of_rtp:
-        rtp_pcap_tx = Path(case[1]) / Path('ns4.dtls.feather')
 
     if rtp_pcap_tx.is_file():
         rtp_pcap_tx_df = serializers.read_feather(rtp_pcap_tx)
@@ -226,10 +223,6 @@ def _get_utilization_df(case, util_of_rtp=True):
         rtp_streams_mapping = roq_stream_mapping[roq_stream_mapping['data.flow_id'].isin(
             plotters._RTP_FOW_IDS)]
 
-        if not util_of_rtp:
-            raise NotImplementedError(
-                "Data utilization for qlog not yet implemented")
-
         if rtp_streams_mapping.empty:
             return pd.DataFrame(), False
 
@@ -260,7 +253,6 @@ def plot_owd_boxplot(name, cases, out):
     legend = []
     dfs = []
     image_name = Path(out) / Path(f"{name}_delay_box.png")
-
     fig, ax = plt.subplots(dpi=FIG_DPI, figsize=FIG_SIZE)
 
     for case in cases:
@@ -333,8 +325,8 @@ def calc_comp_for_test(case):
     return merged_df['completion_time'].to_numpy(), True
 
 
-def _combine_same_tests(cases, avg_fct):
-    # Group cases by test type (case[0])
+def _calc_and_combine_same_tests(cases, avg_fct):
+    """ calc avg with avg_fct and combine same test types"""
     test_type_data = {}
     for case in cases:
         comp_times, ok = avg_fct(case)
@@ -348,8 +340,7 @@ def _combine_same_tests(cases, avg_fct):
 
 
 def calc_avg_comp_time(cases, out):
-    # Group cases by test type (case[0])
-    test_type_data = _combine_same_tests(cases, calc_comp_for_test)
+    test_type_data = _calc_and_combine_same_tests(cases, calc_comp_for_test)
 
     output_file = Path(out) / Path("completion-time.csv")
     results = []
@@ -375,8 +366,7 @@ def calc_avg_comp_time(cases, out):
 
 
 def calc_avg_delay(cases, out):
-    # Group cases by test type (case[0])
-    test_type_data = _combine_same_tests(cases, _get_owd_df)
+    test_type_data = _calc_and_combine_same_tests(cases, _get_owd_df)
 
     output_file = Path(out) / Path("delay.csv")
     results = []
@@ -411,8 +401,7 @@ def calc_avg_delay(cases, out):
 
 
 def calc_util(cases, out):
-    # Group cases by test type (case[0])
-    test_type_data = _combine_same_tests(cases, _get_utilization_df)
+    test_type_data = _calc_and_combine_same_tests(cases, _get_utilization_df)
 
     output_file = Path(out) / Path("util.csv")
     results = []
