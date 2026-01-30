@@ -4,11 +4,13 @@ import argparse
 import asyncio
 
 from pathlib import Path
+from concurrent.futures import ProcessPoolExecutor
 
 import matplotlib.pyplot as plt
 import pandas as pd
 
 import parsers
+import parquetizer
 import plotters
 import html_generator
 import serializers
@@ -209,6 +211,18 @@ async def parse_all_cmd(args):
             await parse_file(file, args.output, ref_time=ref)
 
 
+async def parquetize_cmd(args):
+    inputs = []
+    outputs = []
+    for input in Path(args.input).iterdir():
+        if input.is_dir():
+            inputs.append(input)
+            outputs.append(Path(args.output) / Path(args.input).name /
+                           input.name)
+    with ProcessPoolExecutor() as executor:
+        list(executor.map(parquetizer.parse, inputs, outputs))
+
+
 async def parse_cmd(args):
     await parse_file(args.input, args.output)
 
@@ -295,6 +309,15 @@ def main():
     parse_all.add_argument(
         '-o', '--output', help='output directory', required=True)
     parse_all.set_defaults(func=parse_all_cmd)
+
+    parquetize = subparsers.add_parser('parquetize', help='alternative to '
+                                       'parse parses data and stores it in a '
+                                       'single parquet file per experiment')
+    parquetize.add_argument(
+        '-i', '--input', help='input directory', required=True)
+    parquetize.add_argument(
+        '-o', '--output', help='output directory', required=True)
+    parquetize.set_defaults(func=parquetize_cmd)
 
     plot = subparsers.add_parser(
         'plot', help='reads a data frame from a feather file and creates plots')
