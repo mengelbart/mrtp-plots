@@ -6,6 +6,7 @@ import os
 def test_name_of_image(img: Path):
     return '_'.join(img.name.split('_')[:-1])
 
+
 def generate_html(input):
     data = []
     dir = Path(input)
@@ -22,12 +23,12 @@ def generate_html(input):
     testtypes = set(test_name_of_image(img) for img in images)
 
     for testtype in testtypes:
-        images_one_tpye = [
+        images_one_type = [
             img for img in images if test_name_of_image(img) == testtype]
 
         data.append({
             'name': testtype.replace('_', ' ').capitalize(),
-            'plots': [f for f in images_one_tpye],
+            'plots': [f for f in images_one_type],
         })
 
     script_dir = os.path.dirname(os.path.abspath(__file__))
