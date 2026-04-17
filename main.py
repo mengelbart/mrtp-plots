@@ -156,9 +156,12 @@ def parquetize(input, output):
 
 def parquetize_cmd(args):
     if not args.sequential:
-        run_parallel(parquetize, args.input, args.output)
+        run_parallel(parquetize, args.input, args.output, args.filter)
     else:
-        for input in Path(args.input).iterdir():
+        inputs = Path(args.input).iterdir()
+        if len(args.filter) > 0:
+            inputs = [input for input in inputs if args.filter in input.name]
+        for input in inputs:
             output = Path(args.output) / Path(args.input).name / input.name
             parquetize(input, output)
 
@@ -172,22 +175,21 @@ def plot(input, output):
 
 def plot_cmd(args):
     if not args.sequential:
-        run_parallel(plot, args.input, args.output)
+        run_parallel(plot, args.input, args.output, args.filter)
     else:
         for input in Path(args.input).iterdir():
             output = Path(args.output) / Path(args.input).name / input.name
             plot(input, output)
 
 
-def run_parallel(func, input, output):
+def run_parallel(func, input, output, filter=''):
     inputs = []
     outputs = []
     for subdir_in in Path(input).iterdir():
-        if subdir_in.is_dir():
+        if subdir_in.is_dir() and (len(filter) == 0 or filter in subdir_in.name):
             inputs.append(subdir_in)
             subdir_out = Path(output) / Path(input).name / subdir_in.name
             outputs.append(subdir_out)
-
     with ProcessPoolExecutor() as executor:
         list(executor.map(func, inputs, outputs))
 
@@ -229,6 +231,7 @@ def main():
         '-i', '--input', help='input directory', required=True)
     parquetize.add_argument(
         '-o', '--output', help='output directory', required=True)
+    parquetize.add_argument('--filter', default='')
     parquetize.set_defaults(func=parquetize_cmd)
 
     plot = subparsers.add_parser('plot', help='reads a data frame from a '
@@ -239,6 +242,7 @@ def main():
         '-o', '--output', help='output directory', required=True)
     plot.add_argument('-f', '--format', default='png',
                       help='output file format, e.g., \'pdf\', or \'png\'')
+    plot.add_argument('--filter', default='')
     plot.set_defaults(func=plot_cmd)
 
     generate = subparsers.add_parser(
