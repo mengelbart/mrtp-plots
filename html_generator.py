@@ -31,6 +31,8 @@ def generate_html(input):
             'plots': [f for f in images_one_type],
         })
 
+    data.sort(key=lambda x: x['name'])
+
     script_dir = os.path.dirname(os.path.abspath(__file__))
     template_dir = Path(script_dir) / "templates"
     env = jinja2.Environment(loader=jinja2.FileSystemLoader(template_dir))
