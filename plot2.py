@@ -35,6 +35,7 @@ class Plotter:
         self.plot_loss_rate(dfs)
         self.plot_rate(dfs)
         self.plot_delay(dfs)
+        self.plot_quic_rtt(dfs)
         self.plot_scream_stats(dfs)
         self.plot_video_quality(dfs)
 
@@ -76,6 +77,29 @@ class Plotter:
         ax.legend(bbox_to_anchor=(0., 1.02, 1., .102), loc='lower left',
                   ncols=2, mode="expand", borderaxespad=0.)
         fig.savefig(Path(self.output) / f'loss.{FILE_FORMAT}')
+        plt.close(fig)
+
+    def plot_quic_rtt(self, dfs):
+        if 'qlog-sender-metrics' not in dfs and 'qlog-receiver-metrics' not in dfs:
+            return
+        width = 8
+        height = gr(width)
+        fig, ax = plt.subplots(figsize=(width, height), layout='constrained')
+
+        if 'qlog-receiver-metrics' in dfs:
+            plot_qlog_rtt(ax, dfs['qlog-receiver-metrics'], label='QUIC Rx RTT')
+
+        if 'qlog-sender-metrics' in dfs:
+            plot_qlog_rtt(ax, dfs['qlog-sender-metrics'], label='QUIC Tx RTT')
+
+        ax.set_xlabel('Time')
+        ax.set_ylabel('RTT (s)')
+        ax.xaxis.set_major_formatter(
+            mticker.FuncFormatter(lambda x, pos: f'{x/1e6:.0f}s'))
+        ax.yaxis.set_major_formatter(mticker.EngFormatter(unit='s'))
+        ax.legend(bbox_to_anchor=(0., 1.02, 1., .102), loc='lower left',
+                  ncols=2, mode="expand", borderaxespad=0.)
+        fig.savefig(Path(self.output) / f'quic_rtt.{FILE_FORMAT}')
         plt.close(fig)
 
     def plot_delay(self, dfs):
@@ -128,8 +152,9 @@ class Plotter:
         scream_queue_delay = dfs['metrics'].filter(
             (pl.col('metric') == 'scream_queue_delay')
         )
-        print(scream_rtt)
-        print(scream_queue_delay)
+        if scream_rtt.is_empty() and scream_queue_delay.is_empty():
+            return
+
         fig, ax = plt.subplots(figsize=(width, height), layout='constrained')
         ax.plot(scream_rtt['time_delta'], scream_rtt['value'], label='RTT',
                 linewidth=DEFAULT_LINE_WIDTH)
@@ -228,7 +253,6 @@ def plot_rtp_packets_rate(ax, packets_df):
     )
     ax.plot(tx_rate['time_delta'], tx_rate['payload-length'],
             label='Transmission Rate', linewidth=DEFAULT_LINE_WIDTH)
-
     rx_rate = (
         packets_df.filter(pl.col('time_rx').is_not_null())
         .group_by_dynamic('time', every='1s')
@@ -264,6 +288,15 @@ def plot_qlog_packets_rate(ax, tx_df, rx_df):
     )
     ax.plot(rx_rate['time_delta'], rx_rate['data.raw.length'],
             label='QUIC Rx Rate', linewidth=DEFAULT_LINE_WIDTH)
+
+
+def plot_qlog_rtt(ax, df, **kwargs):
+    rtt = (
+        df
+        .filter(pl.col('name') == 'recovery:metrics_updated')
+        .filter(pl.col('variable') == 'data.latest_rtt')
+    )
+    ax.plot(rtt['time_delta'], rtt['value'] * 0.001, linewidth=DEFAULT_LINE_WIDTH, **kwargs)
 
 
 def plot_delay_from_to(ax, packets_df, a, b, **kwargs):
