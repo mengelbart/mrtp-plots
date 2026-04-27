@@ -3,12 +3,13 @@ from datetime import datetime
 
 import polars as pl
 import subprocess
+import glob
 import json
 from io import StringIO
 
 
 # pl.Config.set_tbl_rows(100)
-# pl.Config.set_tbl_cols(20)
+pl.Config.set_tbl_cols(50)
 
 
 class Parquetizer:
@@ -18,10 +19,12 @@ class Parquetizer:
         self.dfs = {}
         self.pcap_dfs = {}
         self.qlog_dfs = {}
+        self.rtp_tx = None
+        self.rtp_rx = None
 
     def parquetize(self):
+        print(f'parquetizing {self.input} to {self.output}')
         self.read_config()
-        print(self.name)
         self.read_tc()
         self.read_video_quality_log()
         self.read_lost_frames_log()
@@ -33,9 +36,7 @@ class Parquetizer:
             if file.is_file():
                 self.pcap_dfs[Path(file).stem] = parse_pcap(file)
 
-        # TODO: Can we store a config field that states whether we should have
-        # RTP packets instead of testing for presence of the data frame?
-        if hasattr(self, 'rtp_tx') and self.rtp_tx is not None:
+        if self.rtp_tx is not None:
             self.build_rtp_packets_df()
 
         self.build_metrics()
@@ -114,7 +115,7 @@ class Parquetizer:
     def read_sender_log(self):
         lines = read_json_lines(self.input / 'sender.stderr.log')
         self.sender_log = (
-                pl.from_dicts(lines)
+                pl.from_dicts(lines, infer_schema_length=1000)
                 .with_columns(
                     pl.lit(self.name).alias('name'),
                     pl.lit(self.netconf).alias('netconf'),
@@ -129,7 +130,7 @@ class Parquetizer:
     def read_receiver_log(self):
         lines = read_json_lines(self.input / 'receiver.stderr.log')
         receiver_log = (
-                pl.from_dicts(lines)
+                pl.from_dicts(lines, infer_schema_length=1000)
                 .with_columns(
                     pl.lit(self.name).alias('name'),
                     pl.lit(self.netconf).alias('netconf'),
@@ -182,9 +183,10 @@ class Parquetizer:
             )
 
     def read_qlog(self):
-        qlog_files = ['sender.qlog', 'receiver.qlog']
+        qlog_files = glob.glob(f'{self.input}/*.sqlog')
+        print(f'reading qlog files: {qlog_files}')
         for f in qlog_files:
-            path = self.input / f
+            path = Path(f)
             if not (path).is_file():
                 continue
             df = read_qlog(path)
@@ -213,8 +215,9 @@ class Parquetizer:
                 )
                 .drop_nulls()
             )
-            self.qlog_dfs[f'qlog-{Path(f).stem}-packets'] = packets_df
-            self.qlog_dfs[f'qlog-{Path(f).stem}-metrics'] = metrics_df
+            name = f.split('_')[-1]
+            self.qlog_dfs[f'qlog-{Path(name).stem}-packets'] = packets_df
+            self.qlog_dfs[f'qlog-{Path(name).stem}-metrics'] = metrics_df
 
     def build_rtp_packets_df(self):
         df = self.rtp_tx
