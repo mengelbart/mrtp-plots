@@ -130,7 +130,7 @@ class Parquetizer:
     def read_receiver_log(self):
         lines = read_json_lines(self.input / 'receiver.stderr.log')
         receiver_log = (
-                pl.from_dicts(lines, infer_schema_length=1000)
+                pl.from_dicts(lines, infer_schema_length=50000)
                 .with_columns(
                     pl.lit(self.name).alias('name'),
                     pl.lit(self.netconf).alias('netconf'),
@@ -141,6 +141,10 @@ class Parquetizer:
         df = receiver_log.filter(pl.col('msg') == 'rtp packet')
         if 'rtp-packet' in df.columns:
             self.rtp_rx = read_rtp_packets_from_stderr(df)
+
+        df = receiver_log.filter(pl.col('msg') == 'DataSink read')
+        if not df.is_empty():
+            self.dfs['data_rx'] = read_data_from_stderr(df)
 
     def read_video_quality_log(self):
         if not (self.input / 'video.quality.csv').is_file():
@@ -411,6 +415,16 @@ def read_rtp_packets_from_stderr(df):
         )
     )
 
+
+def read_data_from_stderr(df):
+    return (
+        df
+        .select([c for c in df.columns if df[c].null_count() <
+                 df.height])
+        .select(
+            'time', 'name', 'netconf', 'appconf', 'bytes-read',
+        )
+    )
 
 def parse_pcap(file):
     cmd = [

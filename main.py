@@ -11,6 +11,7 @@ import plot2
 import html_generator
 import plot_version_comparison
 import video_quality
+import aggregate
 
 import matplotlib
 
@@ -156,7 +157,7 @@ def parquetize(input, output):
 
 def parquetize_cmd(args):
     if not args.sequential:
-        run_parallel(parquetize, args.input, args.output, args.filter)
+        run_parallel(parquetize, args.input, args.output, filter=args.filter)
     else:
         inputs = Path(args.input).iterdir()
         if len(args.filter) > 0:
@@ -166,32 +167,46 @@ def parquetize_cmd(args):
             parquetize(input, output)
 
 
-def plot(input, output):
+def plot(input, output, format='png'):
     try:
-        plot2.Plotter(input, output).plot()
+        plot2.Plotter(input, output, output_format=format).plot()
     except Exception as e:
         print(f'failed to plot: {input} -> {output}: {e}')
 
 
 def plot_cmd(args):
     if not args.sequential:
-        run_parallel(plot, args.input, args.output, args.filter)
+        run_parallel(plot, args.input, args.output, filter=args.filter, common_args=args.format)
     else:
         for input in Path(args.input).iterdir():
-            output = Path(args.output) / Path(args.input).name / input.name
-            plot(input, output)
+            if len(args.filter) == 0 or args.filter in input.name:
+                output = Path(args.output) / Path(args.input).name / input.name
+                plot(input, output, format=args.format)
 
 
-def run_parallel(func, input, output, filter=''):
+def aggregate_cmd(args):
+    try:
+        aggregate.Aggregator(args.input, args.output, args.format).aggregate()
+    except Exception as e:
+        print(f'failed to aggregate: {args.input} -> {args.output}: {e}')
+
+
+def run_parallel(func, input, output, common_args=None, filter=''):
     inputs = []
     outputs = []
+    args = []
     for subdir_in in Path(input).iterdir():
         if subdir_in.is_dir() and (len(filter) == 0 or filter in subdir_in.name):
             inputs.append(subdir_in)
             subdir_out = Path(output) / Path(input).name / subdir_in.name
             outputs.append(subdir_out)
+            if common_args is not None:
+                args.append(common_args)
     with ProcessPoolExecutor() as executor:
-        list(executor.map(func, inputs, outputs))
+        if len(args) > 0:
+            list(executor.map(func, inputs, outputs, args))
+        else:
+            list(executor.map(func, inputs, outputs))
 
 
 def generate_cmd(args):
@@ -244,6 +259,18 @@ def main():
                       help='output file format, e.g., \'pdf\', or \'png\'')
     plot.add_argument('--filter', default='')
     plot.set_defaults(func=plot_cmd)
+
+    aggregate = subparsers.add_parser(
+        'aggregate', help='aggregates results from several experiments and creates comparison plots')
+    aggregate.add_argument(
+        '-i', '--input', help='input directory', required=True)
+    aggregate.add_argument(
+        '-o', '--output', help='output directory', required=True)
+    # aggregate.add_argument('--mode', default='version',
+    #                        help='comparison mode, e.g., \'version\' to compare different versions, or \'link\' to compare different link configurations')
+    aggregate.add_argument('-f', '--format', default='png',
+                           help='output file format, e.g., \'pdf\', or \'png\'')
+    aggregate.set_defaults(func=aggregate_cmd)
 
     generate = subparsers.add_parser(
         'generate', help='generates a HTML site to show results')

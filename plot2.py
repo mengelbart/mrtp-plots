@@ -3,7 +3,6 @@ import matplotlib.pyplot as plt
 import matplotlib.ticker as mticker
 from pathlib import Path
 
-FILE_FORMAT = 'png'
 DEFAULT_LINE_WIDTH = 1.0
 
 
@@ -30,7 +29,6 @@ class Plotter:
                     (pl.col('time') - start_time).alias('time_delta')
                     .cast(pl.Duration('us'))
                 )
-
         Path(self.output).mkdir(parents=True, exist_ok=True)
         self.plot_loss_rate(dfs)
         self.plot_rate(dfs)
@@ -38,19 +36,81 @@ class Plotter:
         self.plot_quic_rtt(dfs)
         self.plot_scream_stats(dfs)
         self.plot_video_quality(dfs)
+        self.plot_combined_rate_and_latency(dfs)
+        self.plot_combined_quic_rtt_and_latency(dfs)
+
+    def plot_combined_rate_and_latency(self, dfs):
+        width = 8
+        height = gr(width)
+        fig, ax = plt.subplots(nrows=2, ncols=1, figsize=(width, height), sharex=True, layout='constrained')
+        plot_capacity(ax[0], dfs['tc'])
+        if 'data_rx' in dfs and not 'rtp_packets' in dfs:
+            plot_data_rx_rate(ax[0], dfs['data_rx'])
+        if 'rtp_packets' in dfs and not 'data_rx' in dfs:
+            plot_rtp_packets_rate(ax[0], dfs['rtp_packets'])
+        if 'data_rx' in dfs and 'rtp_packets' in dfs:
+            plot_rtp_data_sum_rate(ax[0], dfs['rtp_packets'], dfs['data_rx'])
+        ax[0].set_ylabel('Rate (MBit/s)')
+        ax[0].xaxis.set_major_formatter(
+            mticker.FuncFormatter(lambda x, pos: f'{x/1e6:.0f}s'))
+        ax[0].yaxis.set_major_formatter(
+            mticker.FuncFormatter(lambda x, pos: f'{x/1e6}'))
+        ax[0].legend(bbox_to_anchor=(0., 1.02, 1., .102), loc='lower left',
+                  ncols=2, mode="expand", borderaxespad=0.)
+
+        plot_delay_from_to(ax[1], dfs['rtp_packets'], 'time', 'time_rx',
+                           linewidth=DEFAULT_LINE_WIDTH, linestyle='--',
+                           label='RTP Latency')
+        ax[1].set_ylabel('Latency (ms)')
+        ax[1].yaxis.set_major_formatter(mticker.FuncFormatter(lambda x, pos: f'{x*1e3:.0f}'))
+        ax[1].legend(bbox_to_anchor=(0., 1.02, 1., .102), loc='lower left',
+                  ncols=2, mode="expand", borderaxespad=0.)
+
+        fig.supxlabel('Time')
+        fig.savefig(Path(self.output) / f'combined_rate_latency.{self.output_format}')
+        plt.close(fig)
+
+
+    def plot_combined_quic_rtt_and_latency(self, dfs):
+        if 'qlog-sender-metrics' not in dfs and 'qlog-receiver-metrics' not in dfs:
+            return
+        width = 8
+        height = 3
+        fig, ax = plt.subplots(figsize=(width, height), layout='constrained')
+        plot_delay_from_to(ax, dfs['rtp_packets'], 'time', 'time_rx',
+                           linewidth=DEFAULT_LINE_WIDTH, linestyle='--',
+                           label='RTP Latency')
+        if 'qlog-sender-metrics' in dfs:
+            plot_qlog_rtt(ax, dfs['qlog-sender-metrics'], label='QUIC RTT')
+        ax.set_xlabel('Time')
+        ax.set_ylabel('RTT/Latency (s)')
+        ax.xaxis.set_major_formatter(
+            mticker.FuncFormatter(lambda x, pos: f'{x/1e6:.0f}s'))
+        ax.yaxis.set_major_formatter(mticker.EngFormatter(unit='s'))
+        ax.legend(bbox_to_anchor=(0., 1.02, 1., .102), loc='lower left',
+                  ncols=2, mode="expand", borderaxespad=0.)
+        fig.savefig(Path(self.output) / f'quic_rtt_and_latency.{self.output_format}')
+        plt.close(fig)
+
 
     def plot_rate(self, dfs):
         width = 8
         height = gr(width)
         fig, ax = plt.subplots(figsize=(width, height), layout='constrained')
         plot_capacity(ax, dfs['tc'])
-        if 'metrics' in dfs:
-            plot_target_rate(ax, dfs['metrics'])
-        if 'rtp_packets' in dfs:
+        # if 'metrics' in dfs:
+        #     plot_target_rate(ax, dfs['metrics'])
+
+        if 'data_rx' in dfs and not 'rtp_packets' in dfs:
+            plot_data_rx_rate(ax, dfs['data_rx'])
+        if 'rtp_packets' in dfs and not 'data_rx' in dfs:
             plot_rtp_packets_rate(ax, dfs['rtp_packets'])
-        if 'qlog-sender-packets' in dfs and 'qlog-receiver-packets' in dfs:
-            plot_qlog_packets_rate(ax, dfs['qlog-sender-packets'],
-                                   dfs['qlog-receiver-packets'])
+        if 'data_rx' in dfs and 'rtp_packets' in dfs:
+            plot_rtp_data_sum_rate(ax, dfs['rtp_packets'], dfs['data_rx'])
+
+        # if 'qlog-sender-packets' in dfs and 'qlog-receiver-packets' in dfs:
+        #     plot_qlog_packets_rate(ax, dfs['qlog-sender-packets'],
+        #                            dfs['qlog-receiver-packets'])
         ax.set_xlabel('Time')
         ax.set_ylabel('Rate (MBit/s)')
         ax.xaxis.set_major_formatter(
@@ -59,7 +119,7 @@ class Plotter:
             mticker.FuncFormatter(lambda x, pos: f'{x/1e6}'))
         ax.legend(bbox_to_anchor=(0., 1.02, 1., .102), loc='lower left',
                   ncols=2, mode="expand", borderaxespad=0.)
-        fig.savefig(Path(self.output) / f'rate.{FILE_FORMAT}')
+        fig.savefig(Path(self.output) / f'rate.{self.output_format}')
         plt.close(fig)
 
     def plot_loss_rate(self, dfs):
@@ -76,7 +136,7 @@ class Plotter:
         ax.yaxis.set_major_formatter(mticker.PercentFormatter(xmax=1.0))
         ax.legend(bbox_to_anchor=(0., 1.02, 1., .102), loc='lower left',
                   ncols=2, mode="expand", borderaxespad=0.)
-        fig.savefig(Path(self.output) / f'loss.{FILE_FORMAT}')
+        fig.savefig(Path(self.output) / f'loss.{self.output_format}')
         plt.close(fig)
 
     def plot_quic_rtt(self, dfs):
@@ -99,7 +159,7 @@ class Plotter:
         ax.yaxis.set_major_formatter(mticker.EngFormatter(unit='s'))
         ax.legend(bbox_to_anchor=(0., 1.02, 1., .102), loc='lower left',
                   ncols=2, mode="expand", borderaxespad=0.)
-        fig.savefig(Path(self.output) / f'quic_rtt.{FILE_FORMAT}')
+        fig.savefig(Path(self.output) / f'quic_rtt.{self.output_format}')
         plt.close(fig)
 
     def plot_delay(self, dfs):
@@ -140,7 +200,7 @@ class Plotter:
         ax.xaxis.set_major_formatter(
             mticker.FuncFormatter(lambda x, pos: f'{x/1e6:.0f}s'))
         ax.yaxis.set_major_formatter(mticker.EngFormatter(unit='s'))
-        fig.savefig(Path(self.output) / f'latency.{FILE_FORMAT}')
+        fig.savefig(Path(self.output) / f'latency.{self.output_format}')
         plt.close(fig)
 
     def plot_scream_stats(self, dfs):
@@ -167,7 +227,7 @@ class Plotter:
         ax.yaxis.set_major_formatter(mticker.EngFormatter(unit='s'))
         ax.legend(bbox_to_anchor=(0., 1.02, 1., .102), loc='lower left',
                   ncols=2, mode="expand", borderaxespad=0.)
-        fig.savefig(Path(self.output) / f'scream_rtt_delay.{FILE_FORMAT}')
+        fig.savefig(Path(self.output) / f'scream_rtt_delay.{self.output_format}')
         plt.close(fig)
 
     def plot_video_quality(self, dfs):
@@ -223,7 +283,7 @@ class Plotter:
         ax_psnr_cdf.legend(loc='upper left')
         ax_ssim_cdf.legend(loc='upper right')
 
-        fig.savefig(Path(self.output) / f'video_quality.{FILE_FORMAT}')
+        fig.savefig(Path(self.output) / f'video_quality.{self.output_format}')
         plt.close(fig)
 
 
@@ -242,17 +302,30 @@ def plot_target_rate(ax, metrics_df):
             linewidth=DEFAULT_LINE_WIDTH)
 
 
-def plot_rtp_packets_rate(ax, packets_df):
-    tx_rate = (
-        packets_df.filter(pl.col('time').is_not_null())
+def plot_data_rx_rate(ax, data_rx_df):
+    data_rx_rate = (
+        data_rx_df
         .group_by_dynamic('time', every='1s')
         .agg(
-            pl.col('payload-length').sum() * 8,
+            pl.col('bytes-read').sum() * 8,
             pl.col('time_delta').min()
         )
     )
-    ax.plot(tx_rate['time_delta'], tx_rate['payload-length'],
-            label='Transmission Rate', linewidth=DEFAULT_LINE_WIDTH)
+    ax.plot(data_rx_rate['time_delta'], data_rx_rate['bytes-read'],
+            label='Data Channel Rate', linewidth=DEFAULT_LINE_WIDTH)
+
+
+def plot_rtp_packets_rate(ax, packets_df):
+    # tx_rate = (
+    #     packets_df.filter(pl.col('time').is_not_null())
+    #     .group_by_dynamic('time', every='1s')
+    #     .agg(
+    #         pl.col('payload-length').sum() * 8,
+    #         pl.col('time_delta').min()
+    #     )
+    # )
+    # ax.plot(tx_rate['time_delta'], tx_rate['payload-length'],
+    #         label='Transmission Rate', linewidth=DEFAULT_LINE_WIDTH)
     rx_rate = (
         packets_df.filter(pl.col('time_rx').is_not_null())
         .group_by_dynamic('time', every='1s')
@@ -262,7 +335,40 @@ def plot_rtp_packets_rate(ax, packets_df):
         )
     )
     ax.plot(rx_rate['time_delta'], rx_rate['payload-length'],
-            label='Delivery Rate', linewidth=DEFAULT_LINE_WIDTH)
+            label='RTP Rate', linewidth=DEFAULT_LINE_WIDTH)
+
+
+def plot_rtp_data_sum_rate(ax, rtp_df, data_df):
+    rtp_rx_rate = (
+        rtp_df.filter(pl.col('time_rx').is_not_null())
+        .group_by_dynamic('time', every='1s')
+        .agg(
+            pl.col('payload-length').sum() * 8,
+            pl.col('time_delta').min()
+        )
+    )
+    data_rx_rate = (
+        data_df
+        .group_by_dynamic('time', every='1s')
+        .agg(
+            pl.col('bytes-read').sum() * 8,
+            pl.col('time_delta').min()
+        )
+    )
+    sum_df = rtp_rx_rate.join(data_rx_rate, on='time', how='full').fill_null(0)
+    sum_df = sum_df.with_columns(
+        (pl.col('payload-length') + pl.col('bytes-read')).alias('total_rate')
+    )
+    rtp_rate = sum_df.filter(pl.col('time_delta').is_not_null() & pl.col('payload-length').is_not_null())
+    data_rate = sum_df.filter(pl.col('time_delta').is_not_null() & pl.col('bytes-read').is_not_null())
+    sum_rate = sum_df.filter(pl.col('time_delta').is_not_null() & pl.col('total_rate').is_not_null())
+
+    ax.plot(rtp_rate['time_delta'], rtp_rate['payload-length'],
+            label='RTP Rate', linewidth=DEFAULT_LINE_WIDTH)
+    ax.plot(data_rate['time_delta'], data_rate['bytes-read'],
+            label='Data Rate', linewidth=DEFAULT_LINE_WIDTH)
+    ax.plot(sum_rate['time_delta'], sum_rate['total_rate'],
+            label='RTP + Data Rate', linewidth=DEFAULT_LINE_WIDTH)
 
 
 def plot_qlog_packets_rate(ax, tx_df, rx_df):
