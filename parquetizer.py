@@ -30,6 +30,7 @@ class Parquetizer:
         self.read_lost_frames_log()
         self.read_sender_log()
         self.read_receiver_log()
+        self.read_sim_log()
         self.read_qlog()
         for ns in ['ns1', 'ns2', 'ns3', 'ns4']:
             file = self.input / f'{ns}.pcap'
@@ -112,7 +113,54 @@ class Parquetizer:
             )
         )
 
+    def read_sim_log(self):
+        # workaround for simulation logs, as sender and receiver logs are in the same file
+        # will be removed in the future when simulation produces separate sender and receiver logs
+        rtp_send_points = ['roq sink', 'webrtc-send']
+        rtp_recv_points = ['roq src', 'webrtc-recv']
+
+        if not (self.input / 'sim.stderr.log').is_file():
+            return
+        
+        # sender
+        lines = read_json_lines(self.input / 'sim.stderr.log')
+        self.sender_log = (
+                pl.from_dicts(lines, infer_schema_length=1000)
+                .with_columns(
+                    pl.lit(self.name).alias('name'),
+                    pl.lit(self.netconf).alias('netconf'),
+                    pl.lit(self.appconf).alias('appconf'),
+                    pl.col('time').str.to_datetime('%+'),
+                )
+            )
+        df = self.sender_log.filter((pl.col('msg') == 'rtp packet') & (
+           pl.col('vantage-point').is_in(rtp_send_points)))
+        if 'rtp-packet' in df.columns:
+            self.rtp_tx = read_rtp_packets_from_stderr(df)
+
+        # receiver
+        receiver_log = (
+                pl.from_dicts(lines, infer_schema_length=50000)
+                .with_columns(
+                    pl.lit(self.name).alias('name'),
+                    pl.lit(self.netconf).alias('netconf'),
+                    pl.lit(self.appconf).alias('appconf'),
+                    pl.col('time').str.to_datetime('%+'),
+                )
+            )
+        df = receiver_log.filter((pl.col('msg') == 'rtp packet') & (
+           pl.col('vantage-point').is_in(rtp_recv_points)))
+        if 'rtp-packet' in df.columns:
+            self.rtp_rx = read_rtp_packets_from_stderr(df)
+
+        df = receiver_log.filter(pl.col('msg') == 'DataSink read')
+        if not df.is_empty():
+            self.dfs['data_rx'] = read_data_from_stderr(df)
+
     def read_sender_log(self):
+        # check if we have sim results
+        if (self.input / 'sim.stderr.log').is_file():
+            return
         lines = read_json_lines(self.input / 'sender.stderr.log')
         self.sender_log = (
                 pl.from_dicts(lines, infer_schema_length=1000)
@@ -128,6 +176,9 @@ class Parquetizer:
             self.rtp_tx = read_rtp_packets_from_stderr(df)
 
     def read_receiver_log(self):
+        # check if we have sim results
+        if (self.input / 'sim.stderr.log').is_file():
+            return
         lines = read_json_lines(self.input / 'receiver.stderr.log')
         receiver_log = (
                 pl.from_dicts(lines, infer_schema_length=50000)
