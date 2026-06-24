@@ -98,8 +98,8 @@ class Plotter:
         height = gr(width)
         fig, ax = plt.subplots(figsize=(width, height), layout='constrained')
         plot_capacity(ax, dfs['tc'])
-        # if 'metrics' in dfs:
-        #     plot_target_rate(ax, dfs['metrics'])
+        if 'metrics' in dfs:
+            plot_target_rate(ax, dfs['metrics'])
 
         if 'data_rx' in dfs and not 'rtp_packets' in dfs:
             plot_data_rx_rate(ax, dfs['data_rx'])
@@ -328,6 +328,7 @@ def plot_rtp_packets_rate(ax, packets_df):
     #         label='Transmission Rate', linewidth=DEFAULT_LINE_WIDTH)
     rx_rate = (
         packets_df.filter(pl.col('time_rx').is_not_null())
+        .sort("time")
         .group_by_dynamic('time', every='1s')
         .agg(
             pl.col('payload-length').sum() * 8,
@@ -341,6 +342,7 @@ def plot_rtp_packets_rate(ax, packets_df):
 def plot_rtp_data_sum_rate(ax, rtp_df, data_df):
     rtp_rx_rate = (
         rtp_df.filter(pl.col('time_rx').is_not_null())
+        .sort("time")
         .group_by_dynamic('time', every='1s')
         .agg(
             pl.col('payload-length').sum() * 8,
@@ -349,6 +351,7 @@ def plot_rtp_data_sum_rate(ax, rtp_df, data_df):
     )
     data_rx_rate = (
         data_df
+        .sort("time")
         .group_by_dynamic('time', every='1s')
         .agg(
             pl.col('bytes-read').sum() * 8,
@@ -375,6 +378,7 @@ def plot_qlog_packets_rate(ax, tx_df, rx_df):
     tx_rate = (
         tx_df
         .filter(pl.col('name') == 'transport:packet_sent')
+        .sort("time")
         .group_by_dynamic('time', every='1s')
         .agg(
             pl.col('data.raw.length').sum() * 8,
@@ -386,6 +390,7 @@ def plot_qlog_packets_rate(ax, tx_df, rx_df):
     rx_rate = (
         rx_df
         .filter(pl.col('name') == 'transport:packet_received')
+        .sort("time")
         .group_by_dynamic('time', every='1s')
         .agg(
             pl.col('data.raw.length').sum() * 8,

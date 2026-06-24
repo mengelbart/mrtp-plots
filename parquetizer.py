@@ -37,8 +37,8 @@ class Parquetizer:
             if file.is_file():
                 self.pcap_dfs[Path(file).stem] = parse_pcap(file)
 
-        if self.rtp_tx is not None:
-            self.build_rtp_packets_df()
+
+        self.build_rtp_packets_df()
 
         self.build_metrics()
 
@@ -275,7 +275,13 @@ class Parquetizer:
             self.qlog_dfs[f'qlog-{Path(name).stem}-metrics'] = metrics_df
 
     def build_rtp_packets_df(self):
-        df = self.rtp_tx
+        if self.rtp_tx is not None:
+            df = self.rtp_tx
+        elif self.rtp_rx is not None:
+            df = self.rtp_rx
+        else:
+            return
+
         keys = ['rtp.ssrc', 'rtp.extseq']
         if self.rtp_rx is not None and not self.rtp_rx.is_empty():
             rtp_rx = self.rtp_rx.select(*keys, 'time')
