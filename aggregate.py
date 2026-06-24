@@ -5,6 +5,7 @@ import numpy as np
 from pathlib import Path
 from collections import defaultdict
 
+
 class Aggregator:
     def __init__(self, input_dir, output_dir, output_format='png'):
         self.input_dir = Path(input_dir)
@@ -13,21 +14,25 @@ class Aggregator:
 
     def aggregate(self):
         runs = [p for p in self.input_dir.iterdir() if p.is_dir()]
-        common_experiments = []
+        common_experiments = set()
         for run in runs:
             experiments = {run.name for run in run.iterdir() if run.is_dir()}
-            common_experiments.append(experiments)
-        common_experiments = set.intersection(*common_experiments)
+            common_experiments.update(experiments)
+
+        common_experiments = list(common_experiments)
 
         aggregated_results = defaultdict(lambda: defaultdict(dict))
 
         for experiment in common_experiments:
-            scenario, application = experiment.split('_')[0], experiment.split('_')[1]
+            scenario, application = experiment.split(
+                '_')[0], experiment.split('_')[1]
             bandwidth = int(scenario.split('-')[1].removesuffix('mbit'))
             delay = int(scenario.split('-')[2].removesuffix('ms'))
             print(f'aggregating {scenario}-{application}...')
-            input_dirs = [str(run / experiment) for run in runs]
-            delay_agg, rate_agg, file_transmission_duration = self.aggregate_experiment(input_dirs)
+            input_dirs = [str(run / experiment)
+                          for run in runs if (run / experiment).is_dir()]
+            delay_agg, rate_agg, file_transmission_duration = self.aggregate_experiment(
+                input_dirs)
             aggregated_results[bandwidth][delay][application] = {
                 'delay': delay_agg,
                 'rate': rate_agg,
@@ -52,23 +57,40 @@ class Aggregator:
                         (pl.col('time') - start_time).alias('time_delta')
                         .cast(pl.Duration('us'))
                     )
-            a = 'time'
-            b = 'time_rx'
-            delay_df = (
-                dfs['rtp_packets']
-                .select(pl.col(['time_delta', a, b]))
-                .filter(
-                    pl.col(a).is_not_null(),
-                    pl.col(b).is_not_null(),
-                ).with_columns(
-                    (pl.col(b) - pl.col(a))
-                    .dt.total_seconds(fractional=True).alias('latency')
+
+            if 'browser' in input_dir:
+                a = 'time_ns4'
+                b = 'time_ns1'
+                delay_df = (
+                    dfs['rtp_packets']
+                    .select(pl.col(['time_delta', a, b]))
+                    .filter(
+                        pl.col(a).is_not_null(),
+                        pl.col(b).is_not_null(),
+                    ).with_columns(
+                        (pl.col(b) - pl.col(a))
+                        .dt.total_seconds(fractional=True).alias('latency')
+                    )
                 )
-            )
+            else: 
+                a = 'time'
+                b = 'time_rx'
+                delay_df = (
+                    dfs['rtp_packets']
+                    .select(pl.col(['time_delta', a, b]))
+                    .filter(
+                        pl.col(a).is_not_null(),
+                        pl.col(b).is_not_null(),
+                    ).with_columns(
+                        (pl.col(b) - pl.col(a))
+                        .dt.total_seconds(fractional=True).alias('latency')
+                    )
+                )  
             delay.append(delay_df)
 
             rtp_rx_rate = (
                 dfs['rtp_packets'].filter(pl.col('time_rx').is_not_null())
+                .sort("time")
                 .group_by_dynamic('time', every='1s')
                 .agg(
                     pl.col('payload-length').sum() * 8,
@@ -85,18 +107,19 @@ class Aggregator:
                 ])
                 file_transmission_duration.append(result)
 
-
         delay_agg = pl.concat(delay)
         rate_agg = pl.concat(rate)
         if len(file_transmission_duration) > 0:
-            file_transmission_duration_agg = pl.concat(file_transmission_duration)
+            file_transmission_duration_agg = pl.concat(
+                file_transmission_duration)
         else:
             file_transmission_duration_agg = pl.DataFrame()
         return delay_agg, rate_agg, file_transmission_duration_agg
 
     def plot(self, aggregated_results):
         width = 30
-        fig, ax = plt.subplots(nrows=3, ncols=3, sharey='row', sharex='col', figsize=(width, width/2), layout='constrained')
+        fig, ax = plt.subplots(nrows=3, ncols=3, sharey='row', sharex='col', figsize=(
+            width, width/2), layout='constrained')
         for i, bandwidth in enumerate(sorted(aggregated_results)):
             for j, delay in enumerate(sorted(aggregated_results[bandwidth])):
                 name = f'{bandwidth}-{delay}'
@@ -105,7 +128,8 @@ class Aggregator:
                 for application in reversed(sorted(aggregated_results[bandwidth][delay])):
                     if 'file' in application:
                         duration = aggregated_results[bandwidth][delay][application]['file_transmission_duration']
-                        print(f'{name}-{application}: file transmission duration: {duration["duration"].mean()} (min: {duration["duration"].min()}, max: {duration["duration"].max()})')
+                        print(
+                            f'{name}-{application}: file transmission duration: {duration["duration"].mean()} (min: {duration["duration"].min()}, max: {duration["duration"].max()})')
                         continue
                     delay_agg = aggregated_results[bandwidth][delay][application]['delay']
                     rate_agg = aggregated_results[bandwidth][delay][application]['rate']
@@ -115,31 +139,38 @@ class Aggregator:
                     delay_min = delay_agg['latency'].min()
                     delay_max = delay_agg['latency'].max()
                     max_delay = max(max_delay, delay_max)
-                    delay_err = [[delay_mean - delay_min], [delay_max - delay_mean]]
+                    delay_err = [[delay_mean - delay_min],
+                                 [delay_max - delay_mean]]
                     rate_mean = rate_agg['payload-length'].mean()
                     rate_min = rate_agg['payload-length'].min()
                     rate_max = rate_agg['payload-length'].max()
                     rate_err = [[rate_mean - rate_min], [rate_max - rate_mean]]
                     # print(f'{application}: delay={delay_mean:.3f}s (+{delay_q75-delay_mean:.3f}s, -{delay_mean-delay_q25:.3f}s), rate={rate_mean/1e6:.3f}Mbit/s (+{(rate_q75-rate_mean)/1e6:.3f}Mbit/s, -{(rate_mean-rate_q25)/1e6:.3f}Mbit/s)')
                     print(f'{application}: delay={delay_mean}, delay_q25={delay_min}, delay_q75={delay_max}, rate={rate_mean}, rate_q25={rate_min}, rate_q75={rate_max}')
-                    print(f'{application}: delay_err={delay_err}, rate_err={rate_err}')
+                    print(
+                        f'{application}: delay_err={delay_err}, rate_err={rate_err}')
                     # ax[i, j].errorbar(delay_mean, rate_mean,
                     #             xerr=delay_err, yerr=rate_err, fmt='o', capsize=5, label=application.removesuffix('-gcc'))
                     ax[i, j].errorbar(delay_agg['latency'].mean(), rate_agg['payload-length'].mean(),
-                                xerr=delay_agg['latency'].std(), yerr=rate_agg['payload-length'].std(), fmt='o', capsize=5, label=application.removesuffix('-gcc'))
+                                      xerr=delay_agg['latency'].std(), yerr=rate_agg['payload-length'].std(), fmt='o', capsize=5, label=application.removesuffix('-gcc'))
                 # ax[i, j].set_xlabel('Delay')
                 # ax[i, j].set_ylabel('Rate')
                 ax[i, j].set_title(f'{bandwidth} Mbit/s, {delay} ms')
-                ax[i, j].set_xlim(left=0, right=max_delay) # right=delay_agg['latency'].mean() * 2)
-                ax[i, j].set_ylim(bottom=0, top= 1.2*bandwidth*1e6) # top=rate_agg['payload-length'].mean() * 2)
-                ax[i, j].yaxis.set_major_formatter(mticker.EngFormatter(unit='bit/s'))
-                ax[i, j].xaxis.set_major_formatter(mticker.EngFormatter(unit='s'))
+                # right=delay_agg['latency'].mean() * 2)
+                ax[i, j].set_xlim(left=0, right=max_delay)
+                # top=rate_agg['payload-length'].mean() * 2)
+                ax[i, j].set_ylim(bottom=0, top=1.2*bandwidth*1e6)
+                ax[i, j].yaxis.set_major_formatter(
+                    mticker.EngFormatter(unit='bit/s'))
+                ax[i, j].xaxis.set_major_formatter(
+                    mticker.EngFormatter(unit='s'))
                 ax[i, j].grid()
                 # ax[i, j].legend(bbox_to_anchor=(0., 1.02, 1., .102), loc='lower left',
                 #   ncols=2, mode="expand", borderaxespad=0.)
         fig.supxlabel('Delay')
         fig.supylabel('Rate')
-        fig.legend(handles=ax[0, 0].get_legend_handles_labels()[0], labels=ax[0, 0].get_legend_handles_labels()[1], loc='outside upper center', ncol=4)
+        fig.legend(handles=ax[0, 0].get_legend_handles_labels()[
+                   0], labels=ax[0, 0].get_legend_handles_labels()[1], loc='outside upper center', ncol=4)
         # fig.tight_layout(rect=[0, 0.1, 1, 1])
         fig.savefig(self.output_dir / f'bw_delay_scatter.{self.output_format}')
         plt.close(fig)
