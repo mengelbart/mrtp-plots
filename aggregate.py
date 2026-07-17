@@ -97,11 +97,12 @@ class Aggregator:
     def plot(self, aggregated_results):
         width = 30
         fig, ax = plt.subplots(nrows=3, ncols=3, sharey='row', sharex='col', figsize=(width, width/2), layout='constrained')
+        max_latencies = {}
         for i, bandwidth in enumerate(sorted(aggregated_results)):
             for j, delay in enumerate(sorted(aggregated_results[bandwidth])):
                 name = f'{bandwidth}-{delay}'
                 print(f'plotting {name}...')
-                max_delay = 0
+                max_latency = 0
                 for application in reversed(sorted(aggregated_results[bandwidth][delay])):
                     if 'file' in application:
                         duration = aggregated_results[bandwidth][delay][application]['file_transmission_duration']
@@ -109,38 +110,30 @@ class Aggregator:
                         continue
                     delay_agg = aggregated_results[bandwidth][delay][application]['delay']
                     rate_agg = aggregated_results[bandwidth][delay][application]['rate']
-                    # ax.scatter(delay_agg['latency'].mean(),
-                    #         rate_agg['payload-length'].mean(), label=application)
                     delay_mean = delay_agg['latency'].mean()
                     delay_min = delay_agg['latency'].min()
                     delay_max = delay_agg['latency'].max()
-                    max_delay = max(max_delay, delay_max)
+                    max_latencies[delay] = max(max_latencies.get(delay, 0), delay_mean + delay_agg['latency'].std())
+                    print(f'mean: {delay_mean}, std: {delay_agg['latency'].std()}, sum: {delay_mean + delay_agg['latency'].std()}, max: {max_latency}')
                     delay_err = [[delay_mean - delay_min], [delay_max - delay_mean]]
                     rate_mean = rate_agg['payload-length'].mean()
                     rate_min = rate_agg['payload-length'].min()
                     rate_max = rate_agg['payload-length'].max()
                     rate_err = [[rate_mean - rate_min], [rate_max - rate_mean]]
-                    # print(f'{application}: delay={delay_mean:.3f}s (+{delay_q75-delay_mean:.3f}s, -{delay_mean-delay_q25:.3f}s), rate={rate_mean/1e6:.3f}Mbit/s (+{(rate_q75-rate_mean)/1e6:.3f}Mbit/s, -{(rate_mean-rate_q25)/1e6:.3f}Mbit/s)')
                     print(f'{application}: delay={delay_mean}, delay_q25={delay_min}, delay_q75={delay_max}, rate={rate_mean}, rate_q25={rate_min}, rate_q75={rate_max}')
                     print(f'{application}: delay_err={delay_err}, rate_err={rate_err}')
-                    # ax[i, j].errorbar(delay_mean, rate_mean,
-                    #             xerr=delay_err, yerr=rate_err, fmt='o', capsize=5, label=application.removesuffix('-gcc'))
-                    ax[i, j].errorbar(delay_agg['latency'].mean(), rate_agg['payload-length'].mean(),
-                                xerr=delay_agg['latency'].std(), yerr=rate_agg['payload-length'].std(), fmt='o', capsize=5, label=application.removesuffix('-gcc'))
-                # ax[i, j].set_xlabel('Delay')
-                # ax[i, j].set_ylabel('Rate')
+                    ax[i, j].errorbar(delay_mean, rate_mean, xerr=delay_agg['latency'].std(), yerr=rate_agg['payload-length'].std(),
+                                      fmt='o', capsize=5, label=application.removesuffix('-gcc'))
                 ax[i, j].set_title(f'{bandwidth} Mbit/s, {delay} ms')
-                ax[i, j].set_xlim(left=0, right=max_delay) # right=delay_agg['latency'].mean() * 2)
-                ax[i, j].set_ylim(bottom=0, top= 1.2*bandwidth*1e6) # top=rate_agg['payload-length'].mean() * 2)
+                ax[i, j].set_xlim(left=0, right=1.1*max_latencies[delay])
+                ax[i, j].set_ylim(bottom=0, top= 1.2*bandwidth*1e6)
                 ax[i, j].yaxis.set_major_formatter(mticker.EngFormatter(unit='bit/s'))
                 ax[i, j].xaxis.set_major_formatter(mticker.EngFormatter(unit='s'))
                 ax[i, j].grid()
-                # ax[i, j].legend(bbox_to_anchor=(0., 1.02, 1., .102), loc='lower left',
-                #   ncols=2, mode="expand", borderaxespad=0.)
         fig.supxlabel('Delay')
         fig.supylabel('Rate')
-        fig.legend(handles=ax[0, 0].get_legend_handles_labels()[0], labels=ax[0, 0].get_legend_handles_labels()[1], loc='outside upper center', ncol=4)
-        # fig.tight_layout(rect=[0, 0.1, 1, 1])
+        fig.legend(handles=ax[0, 0].get_legend_handles_labels()[0], labels=ax[0, 0].get_legend_handles_labels()[1],
+                   loc='outside upper center', ncol=4)
         fig.savefig(self.output_dir / f'bw_delay_scatter.{self.output_format}')
         plt.close(fig)
 

@@ -83,10 +83,13 @@ class Plotter:
         if 'qlog-sender-metrics' in dfs:
             plot_qlog_rtt(ax, dfs['qlog-sender-metrics'], label='QUIC RTT')
         ax.set_xlabel('Time')
-        ax.set_ylabel('RTT/Latency (s)')
+        ax.set_yscale('log')
+        ax.set_ylabel('RTT/Latency (ms)')
+        ax.set_yticks([0.025, 0.05, 0.1, 0.2])
         ax.xaxis.set_major_formatter(
             mticker.FuncFormatter(lambda x, pos: f'{x/1e6:.0f}s'))
-        ax.yaxis.set_major_formatter(mticker.EngFormatter(unit='s'))
+        ax.yaxis.set_major_formatter(mticker.FuncFormatter(lambda x, pos: f'{x*1e3:.0f}'))
+        ax.yaxis.set_minor_formatter(mticker.NullFormatter())
         ax.legend(bbox_to_anchor=(0., 1.02, 1., .102), loc='lower left',
                   ncols=2, mode="expand", borderaxespad=0.)
         fig.savefig(Path(self.output) / f'quic_rtt_and_latency.{self.output_format}')

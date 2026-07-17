@@ -16,6 +16,8 @@ import aggregate
 import matplotlib
 
 matplotlib.rcParams.update({'font.size': 20})
+matplotlib.rcParams['pdf.fonttype'] = 42
+matplotlib.rcParams['ps.fonttype'] = 42
 
 plots = [
     # RTP rates
