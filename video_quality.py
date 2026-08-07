@@ -1,10 +1,41 @@
 from pathlib import Path
 
 import cv2
+import json
 import ffmpeg_quality_metrics as ffmpeg
+import pandas as pd
+
 from pandas import DataFrame
 
-import parsers
+
+def parse_json_log_no_convert(log_file):
+    with open(log_file, 'r') as f:
+        data = _read_json_lines(f)
+
+    df = pd.json_normalize(data)
+
+    return df
+
+
+def parse_json_log(log_file):
+    df = parse_json_log_no_convert(log_file)
+    df["time"] = pd.to_datetime(df["time"]).dt.tz_convert(
+        'UTC').dt.tz_localize(None)
+
+    return df
+
+
+def _read_json_lines(log_file):
+    data = []
+    for line in log_file:
+        line = line.strip()
+        if not line:
+            continue
+        try:
+            data.append(json.loads(line))
+        except json.JSONDecodeError:
+            continue
+    return data
 
 
 def map_frames_sender_pipeline(tx_df):
