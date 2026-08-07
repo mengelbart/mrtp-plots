@@ -101,8 +101,8 @@ class Plotter:
         height = gr(width)
         fig, ax = plt.subplots(figsize=(width, height), layout='constrained')
         plot_capacity(ax, dfs['tc'])
-        # if 'metrics' in dfs:
-        #     plot_target_rate(ax, dfs['metrics'])
+        if 'metrics' in dfs:
+            plot_target_rate(ax, dfs['metrics'])
 
         if 'data_rx' in dfs and not 'rtp_packets' in dfs:
             plot_data_rx_rate(ax, dfs['data_rx'])
@@ -111,9 +111,9 @@ class Plotter:
         if 'data_rx' in dfs and 'rtp_packets' in dfs:
             plot_rtp_data_sum_rate(ax, dfs['rtp_packets'], dfs['data_rx'])
 
-        # if 'qlog-sender-packets' in dfs and 'qlog-receiver-packets' in dfs:
-        #     plot_qlog_packets_rate(ax, dfs['qlog-sender-packets'],
-        #                            dfs['qlog-receiver-packets'])
+        if 'qlog-sender-packets' in dfs and 'qlog-receiver-packets' in dfs:
+            plot_qlog_packets_rate(ax, dfs['qlog-sender-packets'],
+                                   dfs['qlog-receiver-packets'])
         ax.set_xlabel('Time')
         ax.set_ylabel('Rate (MBit/s)')
         ax.xaxis.set_major_formatter(
@@ -207,6 +207,8 @@ class Plotter:
         plt.close(fig)
 
     def plot_scream_stats(self, dfs):
+        if 'metrics' not in dfs:
+            return
         width = 8
         height = gr(width)
         scream_rtt = dfs['metrics'].filter(
