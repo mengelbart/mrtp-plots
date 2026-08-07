@@ -40,6 +40,8 @@ class Plotter:
         self.plot_combined_quic_rtt_and_latency(dfs)
 
     def plot_combined_rate_and_latency(self, dfs):
+        if 'data_rx' not in dfs and 'rtp_packets' not in dfs:
+            return
         width = 8
         height = gr(width)
         fig, ax = plt.subplots(nrows=2, ncols=1, figsize=(width, height), sharex=True, layout='constrained')
@@ -58,13 +60,14 @@ class Plotter:
         ax[0].legend(bbox_to_anchor=(0., 1.02, 1., .102), loc='lower left',
                   ncols=2, mode="expand", borderaxespad=0.)
 
-        plot_delay_from_to(ax[1], dfs['rtp_packets'], 'time', 'time_rx',
-                           linewidth=DEFAULT_LINE_WIDTH, linestyle='--',
-                           label='RTP Latency')
-        ax[1].set_ylabel('Latency (ms)')
-        ax[1].yaxis.set_major_formatter(mticker.FuncFormatter(lambda x, pos: f'{x*1e3:.0f}'))
-        ax[1].legend(bbox_to_anchor=(0., 1.02, 1., .102), loc='lower left',
-                  ncols=2, mode="expand", borderaxespad=0.)
+        if 'rtp_packets' in dfs:
+            plot_delay_from_to(ax[1], dfs['rtp_packets'], 'time', 'time_rx',
+                            linewidth=DEFAULT_LINE_WIDTH, linestyle='--',
+                            label='RTP Latency')
+            ax[1].set_ylabel('Latency (ms)')
+            ax[1].yaxis.set_major_formatter(mticker.FuncFormatter(lambda x, pos: f'{x*1e3:.0f}'))
+            ax[1].legend(bbox_to_anchor=(0., 1.02, 1., .102), loc='lower left',
+                    ncols=2, mode="expand", borderaxespad=0.)
 
         fig.supxlabel('Time')
         fig.savefig(Path(self.output) / f'combined_rate_latency.{self.output_format}')
@@ -77,9 +80,10 @@ class Plotter:
         width = 8
         height = 3
         fig, ax = plt.subplots(figsize=(width, height), layout='constrained')
-        plot_delay_from_to(ax, dfs['rtp_packets'], 'time', 'time_rx',
-                           linewidth=DEFAULT_LINE_WIDTH, linestyle='--',
-                           label='RTP Latency')
+        if 'rtp_packets' in dfs:
+            plot_delay_from_to(ax, dfs['rtp_packets'], 'time', 'time_rx',
+                               linewidth=DEFAULT_LINE_WIDTH, linestyle='--',
+                               label='RTP Latency')
         if 'qlog-sender-metrics' in dfs:
             plot_qlog_rtt(ax, dfs['qlog-sender-metrics'], label='QUIC RTT')
         ax.set_xlabel('Time')
@@ -116,6 +120,7 @@ class Plotter:
                                    dfs['qlog-receiver-packets'])
         ax.set_xlabel('Time')
         ax.set_ylabel('Rate (MBit/s)')
+        ax.set_ylim(bottom=0)
         ax.xaxis.set_major_formatter(
             mticker.FuncFormatter(lambda x, pos: f'{x/1e6:.0f}s'))
         ax.yaxis.set_major_formatter(
