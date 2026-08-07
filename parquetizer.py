@@ -9,7 +9,7 @@ from io import StringIO
 
 
 # pl.Config.set_tbl_rows(100)
-pl.Config.set_tbl_cols(50)
+pl.Config.set_tbl_cols(20)
 
 
 class Parquetizer:
@@ -114,14 +114,15 @@ class Parquetizer:
         )
 
     def read_sim_log(self):
-        # workaround for simulation logs, as sender and receiver logs are in the same file
-        # will be removed in the future when simulation produces separate sender and receiver logs
+        # workaround for simulation logs, as sender and receiver logs are in
+        # the same file. will be removed in the future when simulation produces
+        # separate sender and receiver logs.
         rtp_send_points = ['roq sink', 'webrtc-send']
         rtp_recv_points = ['roq src', 'webrtc-recv']
 
         if not (self.input / 'sim.stderr.log').is_file():
             return
-        
+
         # sender
         lines = read_json_lines(self.input / 'sim.stderr.log')
         self.sender_log = (
@@ -365,66 +366,28 @@ class Parquetizer:
                 )
             )
             self.dfs['metrics'] = pl.concat([self.dfs['metrics'], gcc])
+
         if 'scream' in self.name:
             scream = (
                 self.sender_log
-                .filter(pl.col('msg') == 'got scream statistics')
-                .with_columns(
-                    pl.col('stats').str.extract_groups(
-                        r'\s+summary (\d+.\d+)\s+'
-                        r'Transmit rate =\s+(\d+.+),\s+'
-                        r'PLR =\s+(\d+\.\d+)%\(\s+(\d+.\d+)%\), '
-                        r'CE =\s+(\d+.\d+)%\(\s+(\d+.\d+)%\)'
-                        r'\[\s*'
-                        r'(\d+.\d+)%,\s+(\d+.\d+)%,\s+(\d+.\d+)%,\s+(\d+.\d+)%'
-                        r'\],\s+'
-                        r'RTT =\s+(\d+.\d+)s,\s+'
-                        r'Queue delay =\s+(\d+.\d+)s.*'
-                    )
-                    .struct.rename_fields(['ssrc', 'tr-rate', 'loss1',
-                                           'loss2', 'ce1', 'ce2', 'ce3', 'ce4',
-                                           'ce5', 'ce6', 'scream_rtt',
-                                           'scream_queue_delay'])
-                )
-                .unnest('stats')
-                .with_columns(
-                    pl.col(['ssrc', 'loss1', 'loss2', 'ce1', 'ce2', 'ce3',
-                            'ce4', 'ce5', 'ce6', 'scream_rtt',
-                            'scream_queue_delay'])
-                    .cast(pl.Float64)
-                )
-                .with_columns(
-                    pl.col('tr-rate')
-                    .str.extract_groups(r'(\d+)([a-zA-Z]+)')
-                )
-                .with_columns(
-                    pl.col('tr-rate').struct.field('1').cast(pl.Float64)
-                    .alias('tr-rate-value'),
-                    pl.col('tr-rate').struct.field('2')
-                    .alias('tr-rate-unit')
-                )
-                .with_columns(
-                    pl.when(pl.col('tr-rate-unit') == 'bps').then(1)
-                    .when(pl.col('tr-rate-unit') == 'kbps').then(1_000)
-                    .when(pl.col('tr-rate-unit') == 'mbps').then(1_000_000)
-                    .when(pl.col('tr-rate-unit') == 'gbps').then(1_000_000_000)
-                    .otherwise(0)
-                    .alias('tr-rate-multiplier')
-                )
-                .with_columns(
-                    (pl.col('tr-rate-value') *
-                     pl.col('tr-rate-multiplier')).alias('transmit-rate'),
-                )
-                .drop('tr-rate-value')
-                .drop('tr-rate-unit')
-                .drop('tr-rate-multiplier')
-                .drop('level')
-                .drop('msg')
+                .filter(pl.col('msg') == 'SCReAM stats')
+                .select(['time', 'name', 'netconf', 'appconf', 'queueDelay',
+                         'queueDelayMax', 'sRtt', 'cwnd', 'bytesInFlightLog',
+                         'rateTransmitted', 'isInFastStart', 'rtpQueueDelay',
+                         'targetBitrate', 'rateRtp', 'packetsRtp',
+                         'rateTransmittedStream', 'rateAcked', 'rateLost',
+                         'rateCe', 'packetsCe', 'hiSeqTx', 'hiSeqAck',
+                         'SeqDiff', 'packetetsRtpCleared', 'packetsLost',
+                         'rtpqueue_full', 'force_idr'])
                 .unpivot(
                     index=['time', 'name', 'netconf', 'appconf'],
-                    on=['transmit-rate', 'loss1', 'loss2', 'ce1', 'ce2', 'ce3',
-                        'ce4', 'ce5', 'ce6', 'scream_rtt',
-                        'scream_queue_delay'],
+                    on=['queueDelay', 'queueDelayMax', 'sRtt', 'cwnd',
+                        'bytesInFlightLog', 'rateTransmitted', 'isInFastStart',
+                        'rtpQueueDelay', 'targetBitrate', 'rateRtp',
+                        'packetsRtp', 'rateTransmittedStream', 'rateAcked',
+                        'rateLost', 'rateCe', 'packetsCe', 'hiSeqTx',
+                        'hiSeqAck', 'SeqDiff', 'packetetsRtpCleared',
+                        'packetsLost', 'rtpqueue_full', 'force_idr'],
                     variable_name='metric',
                 )
                 .select(['name', 'netconf', 'appconf', 'time', 'metric',
@@ -476,6 +439,7 @@ def read_data_from_stderr(df):
             'time', 'name', 'netconf', 'appconf', 'bytes-read',
         )
     )
+
 
 def parse_pcap(file):
     cmd = [
