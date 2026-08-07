@@ -21,6 +21,7 @@ class Parquetizer:
         self.qlog_dfs = {}
         self.rtp_tx = None
         self.rtp_rx = None
+        self.pcap_rtp_namespaces = set()
 
     def parquetize(self):
         print(f'parquetizing {self.input} to {self.output}')
@@ -32,10 +33,14 @@ class Parquetizer:
         self.read_receiver_log()
         self.read_sim_log()
         self.read_qlog()
+        self.read_scream_log()
         for ns in ['ns1', 'ns2', 'ns3', 'ns4']:
             file = self.input / f'{ns}.pcap'
             if file.is_file():
                 self.pcap_dfs[Path(file).stem] = parse_pcap(file)
+
+        if self.rtp_tx is None:
+            self.read_pcap_rtp_packets()
 
         if self.rtp_tx is not None:
             self.build_rtp_packets_df()
@@ -163,6 +168,9 @@ class Parquetizer:
         if (self.input / 'sim.stderr.log').is_file():
             return
         lines = read_json_lines(self.input / 'sender.stderr.log')
+        if len(lines) == 0:
+            print(f'no json lines in {self.input / "sender.stderr.log"}')
+            return
         self.sender_log = (
                 pl.from_dicts(lines, infer_schema_length=1000)
                 .with_columns(
@@ -181,6 +189,9 @@ class Parquetizer:
         if (self.input / 'sim.stderr.log').is_file():
             return
         lines = read_json_lines(self.input / 'receiver.stderr.log')
+        if len(lines) == 0:
+            print(f'no json lines in {self.input / "sender.stderr.log"}')
+            return
         receiver_log = (
                 pl.from_dicts(lines, infer_schema_length=50000)
                 .with_columns(
@@ -275,6 +286,43 @@ class Parquetizer:
             self.qlog_dfs[f'qlog-{Path(name).stem}-packets'] = packets_df
             self.qlog_dfs[f'qlog-{Path(name).stem}-metrics'] = metrics_df
 
+    def read_pcap_rtp_packets(self):
+        # applications that don't write structured logs (e.g. the scream bw
+        # test binaries) leave the pcaps as the only source of rtp packets.
+        namespaces = {
+            app['name']: app['namespace']
+            for app in self.config['applications']
+        }
+        tx = self.pcap_dfs.get(namespaces.get('sender'))
+        rx = self.pcap_dfs.get(namespaces.get('receiver'))
+        if tx is None or tx.is_empty():
+            return
+        print(f'reading rtp packets from pcaps: {namespaces}')
+        self.rtp_tx = self.read_rtp_packets_from_pcap(tx)
+        self.pcap_rtp_namespaces = {namespaces.get('sender')}
+        if rx is not None and not rx.is_empty():
+            self.rtp_rx = self.read_rtp_packets_from_pcap(rx)
+            self.pcap_rtp_namespaces.add(namespaces.get('receiver'))
+
+    def read_rtp_packets_from_pcap(self, df):
+        return (
+            df
+            .with_columns(
+                pl.lit(self.name).alias('name'),
+                pl.lit(self.netconf).alias('netconf'),
+                pl.lit(self.appconf).alias('appconf'),
+            )
+            .rename({
+                'rtp.timestamp': 'timestamp',
+                # pcaps only carry the frame size, not the rtp payload size
+                'frame.len': 'payload-length',
+            })
+            .select(
+                'time', 'name', 'netconf', 'appconf',
+                'rtp.extseq', 'timestamp', 'rtp.ssrc', 'payload-length',
+            )
+        )
+
     def build_rtp_packets_df(self):
         df = self.rtp_tx
         keys = ['rtp.ssrc', 'rtp.extseq']
@@ -286,6 +334,10 @@ class Parquetizer:
                       validate='1:1')
             )
         for ns, ns_df in self.pcap_dfs.items():
+            # skip the pcaps already used as tx/rx, they would only duplicate
+            # the 'time' and 'time_rx' columns
+            if ns in self.pcap_rtp_namespaces:
+                continue
             if (ns_df is not None and not ns_df.is_empty()
                     and all([c in ns_df.columns for c in keys])):
                 ns_df = ns_df.select(*keys, 'time')
@@ -295,6 +347,39 @@ class Parquetizer:
                           validate='1:1')
                 )
         self.dfs['rtp_packets'] = df
+
+
+    def read_scream_log(self):
+        if not (self.input / 'scream.log').is_file():
+            return
+        reference_time = self.dfs['config'][0]['time']
+        self.dfs['scream'] = (
+                pl.read_csv(self.input / 'scream.log')
+                .rename({'Target Bitrate': 'target-rate'})
+                # some columns are padded with spaces and end up as strings
+                .with_columns(
+                    pl.col(pl.String).str.strip_chars().cast(pl.Float64)
+                )
+                .with_columns(
+                    pl.lit(self.name).alias('name'),
+                    pl.lit(self.netconf).alias('netconf'),
+                    pl.lit(self.appconf).alias('appconf'),
+                )
+                .with_columns(
+                    ((pl.col('Time [s]') * 1_000_000)
+                     .cast(pl.Int64)
+                     .cast(pl.Duration('us')) +
+                     reference_time).alias('time')
+                )
+                
+                .unpivot(
+                    index=['name', 'netconf', 'appconf', 'time'],
+                    on=['Estimated queue delay [s]', 'RTT [s]', 'Congestion window [byte]', 'Bytes in flight [byte]', 'Fast increase mode', 'Total transmit bitrate [bps]', 'Stream ID', 'RTP SN', 'Bytes newly ACKed', 'Bytes newly ACKed and CE marked', 'Media coder bitrate [bps]', 'Transmitted bitrate [bps]', 'ACKed bitrate [bps]', 'Lost bitrate [bps]', 'CE Marked bitrate [bps]', 'Marker bit set', 'target-rate', 'RTP queue delay [s]', 'CWND Inflexion Point'],
+                    variable_name='metric',
+                )
+                .select(['name', 'netconf', 'appconf', 'time', 'metric', 'value'])
+            )
+
 
     def build_metrics(self):
         fixed_vars = ['name', 'netconf', 'appconf', 'time']
@@ -306,94 +391,100 @@ class Parquetizer:
             'metric': pl.String,
             'value': pl.Float64,
         })
-        # filter target rate log messages
-        target_rate = (
-                self
-                .sender_log.filter(pl.col('msg') == 'NEW_TARGET_MEDIA_RATE')
-            )
-        if 'rate' in target_rate.columns and not target_rate.is_empty():
+
+        if hasattr(self, 'sender_log'):
+            # filter target rate log messages
             target_rate = (
-                    target_rate
-                    .rename({'rate': 'target-rate'})
-                    .with_columns(
-                        pl.col(['target-rate'])
-                        .cast(pl.Float64)
+                    self
+                    .sender_log.filter(pl.col('msg') == 'NEW_TARGET_MEDIA_RATE')
+                )
+            if 'rate' in target_rate.columns and not target_rate.is_empty():
+                target_rate = (
+                        target_rate
+                        .rename({'rate': 'target-rate'})
+                        .with_columns(
+                            pl.col(['target-rate'])
+                            .cast(pl.Float64)
+                        )
+                        .unpivot(
+                            index=fixed_vars,
+                            on=['target-rate'],
+                            variable_name='metric',
+                        )
                     )
+                self.dfs['metrics'] = pl.concat([self.dfs['metrics'], target_rate])
+
+            # filter gcc log messages
+            if 'gcc' in self.name:
+                gcc = (
+                    self.sender_log
+                    .with_columns(
+                        pl
+                        .col('msg').str.extract_groups(
+                            r'rtt=(\d+), delivered=(\d+), lossTarget=(\d+), '
+                            r'delayTarget=(\d+), target=(\d+)'
+                        )
+                        .alias('gcc-rate-groups')
+                    )
+                    .with_columns(
+                        pl.col('gcc-rate-groups')
+                        .struct.field('1').cast(pl.Float64)
+                        .alias('gcc-rtt'),
+                        pl.col('gcc-rate-groups')
+                        .struct.field('2').cast(pl.Float64).
+                        alias('gcc-delivered'),
+                        pl.col('gcc-rate-groups')
+                        .struct.field('3').cast(pl.Float64)
+                        .alias('gcc-loss-target'),
+                        pl.col('gcc-rate-groups')
+                        .struct.field('4').cast(pl.Float64)
+                        .alias('gcc-delay-target'),
+                        pl.col('gcc-rate-groups')
+                        .struct.field('5').cast(pl.Float64)
+                        .alias('gcc-target'),
+                    )
+                    .filter(pl.col('gcc-rtt').is_not_null())
+                    .drop('gcc-rate-groups')
                     .unpivot(
                         index=fixed_vars,
-                        on=['target-rate'],
+                        on=['gcc-rtt', 'gcc-delivered', 'gcc-loss-target',
+                            'gcc-delay-target', 'gcc-target'],
                         variable_name='metric',
                     )
                 )
-            self.dfs['metrics'] = pl.concat([self.dfs['metrics'], target_rate])
+                self.dfs['metrics'] = pl.concat([self.dfs['metrics'], gcc])
 
-        # filter gcc log messages
-        if 'gcc' in self.name:
-            gcc = (
-                self.sender_log
-                .with_columns(
-                    pl
-                    .col('msg').str.extract_groups(
-                        r'rtt=(\d+), delivered=(\d+), lossTarget=(\d+), '
-                        r'delayTarget=(\d+), target=(\d+)'
+            scream_stats = self.sender_log.filter(pl.col('msg') == 'SCReAM stats')
+            if not scream_stats.is_empty():
+                scream = (
+                    scream_stats
+                    .select(['time', 'name', 'netconf', 'appconf', 'queueDelay',
+                            'queueDelayMax', 'sRtt', 'cwnd', 'bytesInFlightLog',
+                            'rateTransmitted', 'isInFastStart', 'rtpQueueDelay',
+                            'targetBitrate', 'rateRtp', 'packetsRtp',
+                            'rateTransmittedStream', 'rateAcked', 'rateLost',
+                            'rateCe', 'packetsCe', 'hiSeqTx', 'hiSeqAck',
+                            'SeqDiff', 'packetetsRtpCleared', 'packetsLost',
+                            'rtpqueue_full', 'force_idr'])
+                    .unpivot(
+                        index=['time', 'name', 'netconf', 'appconf'],
+                        on=['queueDelay', 'queueDelayMax', 'sRtt', 'cwnd',
+                            'bytesInFlightLog', 'rateTransmitted', 'isInFastStart',
+                            'rtpQueueDelay', 'targetBitrate', 'rateRtp',
+                            'packetsRtp', 'rateTransmittedStream', 'rateAcked',
+                            'rateLost', 'rateCe', 'packetsCe', 'hiSeqTx',
+                            'hiSeqAck', 'SeqDiff', 'packetetsRtpCleared',
+                            'packetsLost', 'rtpqueue_full', 'force_idr'],
+                        variable_name='metric',
                     )
-                    .alias('gcc-rate-groups')
+                    .select(['name', 'netconf', 'appconf', 'time', 'metric',
+                            'value'])
                 )
-                .with_columns(
-                    pl.col('gcc-rate-groups')
-                    .struct.field('1').cast(pl.Float64)
-                    .alias('gcc-rtt'),
-                    pl.col('gcc-rate-groups')
-                    .struct.field('2').cast(pl.Float64).
-                    alias('gcc-delivered'),
-                    pl.col('gcc-rate-groups')
-                    .struct.field('3').cast(pl.Float64)
-                    .alias('gcc-loss-target'),
-                    pl.col('gcc-rate-groups')
-                    .struct.field('4').cast(pl.Float64)
-                    .alias('gcc-delay-target'),
-                    pl.col('gcc-rate-groups')
-                    .struct.field('5').cast(pl.Float64)
-                    .alias('gcc-target'),
-                )
-                .filter(pl.col('gcc-rtt').is_not_null())
-                .drop('gcc-rate-groups')
-                .unpivot(
-                    index=fixed_vars,
-                    on=['gcc-rtt', 'gcc-delivered', 'gcc-loss-target',
-                        'gcc-delay-target', 'gcc-target'],
-                    variable_name='metric',
-                )
-            )
-            self.dfs['metrics'] = pl.concat([self.dfs['metrics'], gcc])
+                self.dfs['metrics'] = pl.concat([self.dfs['metrics'], scream])
 
-        if 'scream' in self.name:
-            scream = (
-                self.sender_log
-                .filter(pl.col('msg') == 'SCReAM stats')
-                .select(['time', 'name', 'netconf', 'appconf', 'queueDelay',
-                         'queueDelayMax', 'sRtt', 'cwnd', 'bytesInFlightLog',
-                         'rateTransmitted', 'isInFastStart', 'rtpQueueDelay',
-                         'targetBitrate', 'rateRtp', 'packetsRtp',
-                         'rateTransmittedStream', 'rateAcked', 'rateLost',
-                         'rateCe', 'packetsCe', 'hiSeqTx', 'hiSeqAck',
-                         'SeqDiff', 'packetetsRtpCleared', 'packetsLost',
-                         'rtpqueue_full', 'force_idr'])
-                .unpivot(
-                    index=['time', 'name', 'netconf', 'appconf'],
-                    on=['queueDelay', 'queueDelayMax', 'sRtt', 'cwnd',
-                        'bytesInFlightLog', 'rateTransmitted', 'isInFastStart',
-                        'rtpQueueDelay', 'targetBitrate', 'rateRtp',
-                        'packetsRtp', 'rateTransmittedStream', 'rateAcked',
-                        'rateLost', 'rateCe', 'packetsCe', 'hiSeqTx',
-                        'hiSeqAck', 'SeqDiff', 'packetetsRtpCleared',
-                        'packetsLost', 'rtpqueue_full', 'force_idr'],
-                    variable_name='metric',
-                )
-                .select(['name', 'netconf', 'appconf', 'time', 'metric',
-                         'value'])
-            )
-            self.dfs['metrics'] = pl.concat([self.dfs['metrics'], scream])
+
+        if 'scream' in self.dfs:
+            self.dfs['metrics'] = pl.concat([self.dfs['metrics'], self.dfs['scream']])
 
 
 def read_json_lines(file):
